@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/**
+ * ===== Enums =====
+ */
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum Role {
+  DEVELOPER
+  SUPER_ADMIN
+  ADMIN
+}
+
+/**
+ * ===== auth Models =====
+ */
+model User {
+  id            String        @id @default(cuid())
+  name          String?
+  email         String        @unique
+  emailVerified DateTime?     @map("email_verified")
+  password      String
+  role          Role          @default(ADMIN)
+  status        AccountStatus @default(ACTIVE)
+  suspendedAt   DateTime?     @map("suspended_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+}
+
+model PasswordResetOtp {
+  id         String    @id @default(cuid())
+  email      String    @db.VarChar(255)
+  codeHash   String    @map("code_hash")
+  expiresAt  DateTime  @map("expires_at")
+  attempts   Int       @default(0)
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([email, createdAt])
+}
