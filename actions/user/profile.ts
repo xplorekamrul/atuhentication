@@ -11,6 +11,7 @@ const updateProfileSchema = z.object({
    name: z.string().min(2, "Name required"),
    username: z.string().min(2, "Username required").max(50),
    email: z.string().email("Invalid email"),
+   image: z.string().optional().nullable().or(z.literal("")),
 });
 
 export const updateProfile = actionClient
@@ -21,7 +22,7 @@ export const updateProfile = actionClient
          return { ok: false as const, message: "Unauthorized" };
       }
 
-      const { name, username, email } = parsedInput;
+      const { name, username, email, image } = parsedInput;
       const userId = session.user.id;
 
       // Check availability if changed
@@ -39,7 +40,12 @@ export const updateProfile = actionClient
 
       await prisma.user.update({
          where: { id: userId },
-         data: { name, username, email },
+         data: {
+            name,
+            username,
+            email,
+            image: image === "" ? null : image
+         },
       });
 
       revalidatePath("/profile");

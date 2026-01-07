@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "RareviewIt" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full" suppressHydrationWarning>
       <body className="min-h-screen bg-light dark:bg-background text-foreground">
         <AppProviders>
           {children}

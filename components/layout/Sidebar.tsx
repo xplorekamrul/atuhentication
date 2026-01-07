@@ -97,21 +97,21 @@ export default function Sidebar({
     <TooltipProvider delayDuration={100}>
       <aside
         className={clsx(
-          "sticky top-0 h-dvh shrink-0 border-r border-border bg-primary/80 backdrop-blur",
+          "sticky top-0 h-dvh shrink-0 border-r border-border bg-primary/80 backdrop-blur flex flex-col",
           "transition-[width] duration-300 ease-in-out",
           "w-(--sb-w)"
         )}
         aria-label="Sidebar"
       >
         {/* Header */}
-        <div className="flex h-14 items-center justify-between px-2">
+        <div className="flex h-14 shrink-0 items-center justify-between px-2 text-white">
           <div
             className={clsx(
               "flex items-center gap-2 overflow-hidden transition-opacity",
               collapsed ? "opacity-0 pointer-events-none" : "opacity-100"
             )}
           >
-            <span className="ml-2 font-semibold text-white">Hr Plus</span>
+            <span className="ml-2 font-semibold truncate">RareviewIt.com</span>
           </div>
 
           <div className="flex items-center gap-1">
@@ -128,65 +128,66 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* User */}
+        {/* User Info (Top) - Clickable to Profile */}
         {user && (
-          <div className={clsx("flex items-center gap-2 p-2", collapsed ? "justify-center" : "")}>
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs text-primary font-semibold">
-              {initials(user.name, user.email)}
-            </div>
-            {!collapsed && (
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-white">{user.name ?? user.email}</p>
-                <p className="truncate text-[11px] text-gray-200/80">{user.email}</p>
-              </div>
+          <div className="px-2 mb-2 shrink-0">
+            {maybeWrapWithTooltip(
+              <Link
+                href="/profile"
+                className={clsx(
+                  "flex items-center gap-2 rounded-lg bg-white/10 p-2 text-white hover:bg-white/20 transition overflow-hidden",
+                  collapsed ? "justify-center" : ""
+                )}
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs text-primary font-bold uppercase overflow-hidden border border-white/20">
+                  {user.image ? (
+                    <img src={user.image} alt={user.name || "User"} className="h-full w-full object-cover" />
+                  ) : (
+                    initials(user.name, user.email)
+                  )}
+                </div>
+                {!collapsed && (
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{user.name ?? "User"}</p>
+                    <p className="truncate text-[10px] opacity-70">{user.email}</p>
+                  </div>
+                )}
+              </Link>,
+              "My Profile"
             )}
           </div>
         )}
 
-        {/* Nav */}
-        <nav className="mt-2 flex flex-col gap-1 px-2 mb-2">
-          {items.map((it) => {
-            const Icon = it.icon;
-            const isActive = pathname === it.href;
-            const link = (
-              <Link
-                key={it.href}
-                href={it.href}
-                className={clsx(
-                  "group inline-flex items-center gap-3 rounded-md px-2 py-2 text-sm w-full font-medium transition-colors ",
-                  "hover:bg-white/20 text-white/90",
-                  isActive && "bg-white/20 border border-white/20",
-                  collapsed ? "justify-center" : "justify-start"
-                )}
-                aria-label={it.label}
-              >
-                <Icon className="h-5 w-5 shrink-0" />
-                {!collapsed && <span className="truncate">{it.label}</span>}
-              </Link>
-            );
+        {/* Scrollable Nav Area */}
+        <div className="flex-1 overflow-y-auto px-2 py-2">
+          <nav className="flex flex-col gap-1">
+            {items.map((it) => {
+              const Icon = it.icon;
+              const isActive = pathname === it.href;
+              const link = (
+                <Link
+                  key={it.href}
+                  href={it.href}
+                  className={clsx(
+                    "group inline-flex items-center gap-3 rounded-md px-2 py-2 text-sm w-full font-medium transition-colors ",
+                    "hover:bg-white/20 text-white/90",
+                    isActive && "bg-white/20 border border-white/20",
+                    collapsed ? "justify-center" : "justify-start"
+                  )}
+                  aria-label={it.label}
+                >
+                  <Icon className="h-5 w-5 shrink-0" />
+                  {!collapsed && <span className="truncate">{it.label}</span>}
+                </Link>
+              );
 
-            return <div key={it.href}>{maybeWrapWithTooltip(link, it.label)}</div>;
-          })}
-        </nav>
+              return <div key={it.href}>{maybeWrapWithTooltip(link, it.label)}</div>;
+            })}
+          </nav>
+        </div>
 
-        {/* Footer */}
-        <div className="mt-auto border-t border-border p-2 flex flex-col gap-2">
-          {user &&
-            maybeWrapWithTooltip(
-              <button
-                onClick={handleSignOut}
-                className={clsx(
-                  "flex items-center gap-2 rounded-md px-2 py-2 text-sm text-white hover:bg-white/20 transition w-full",
-                  collapsed ? "justify-center" : "justify-start"
-                )}
-                aria-label="Sign out"
-              >
-                <LogOut className="h-4 w-4" />
-                {!collapsed && <span>Sign out</span>}
-              </button>,
-              "Sign out"
-            )}
-
+        {/* Footer (Fixed Bottom) */}
+        <div className="shrink-0 border-t border-white/10 p-2 flex flex-col gap-1 mt-auto">
           {maybeWrapWithTooltip(
             <Link
               href="/help"
@@ -196,13 +197,28 @@ export default function Sidebar({
               )}
               aria-label="Help / Docs"
             >
-              <HelpCircle className="h-4 w-4" />
+              <HelpCircle className="h-4 w-4 shrink-0" />
               {!collapsed && <span>Help / Docs</span>}
             </Link>,
-            "Help "
+            "Help"
+          )}
+
+          {maybeWrapWithTooltip(
+            <button
+              onClick={handleSignOut}
+              className={clsx(
+                "flex items-center gap-2 rounded-md px-2 py-2 text-sm text-white hover:bg-white/20 transition w-full",
+                collapsed ? "justify-center" : "justify-start"
+              )}
+              aria-label="Sign out"
+            >
+              <LogOut className="h-4 w-4 shrink-0" />
+              {!collapsed && <span>Sign out</span>}
+            </button>,
+            "Sign out"
           )}
         </div>
       </aside>
-    </TooltipProvider >
+    </TooltipProvider>
   );
 }

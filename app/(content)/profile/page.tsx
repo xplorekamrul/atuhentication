@@ -1,10 +1,10 @@
-import PasswordForm from "@/components/profile/PasswordForm";
+import ChangePasswordDialog from "@/components/profile/ChangePasswordDialog";
+import LoginHistoryTable from "@/components/profile/LoginHistoryTable";
 import ProfileForm from "@/components/profile/ProfileForm";
 import UserInfoCard from "@/components/profile/UserInfoCard";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import LoginHistoryTable from "@/components/profile/LoginHistoryTable";
 
 export default async function ProfilePage() {
    const session = await auth();
@@ -18,6 +18,7 @@ export default async function ProfilePage() {
          name: true,
          email: true,
          username: true,
+         image: true,
          userInfo: true,
          loginHistory: {
             take: 10,
@@ -34,6 +35,7 @@ export default async function ProfilePage() {
       name: user.name ?? "",
       email: user.email,
       username: user.username ?? "",
+      image: user.image,
    };
 
    const userInfoData = {
@@ -60,7 +62,7 @@ export default async function ProfilePage() {
 
          <div className="grid gap-8 md:grid-cols-2">
             <ProfileForm user={userData} />
-            <PasswordForm />
+            <ChangePasswordDialog />
          </div>
 
          <div className="w-full">

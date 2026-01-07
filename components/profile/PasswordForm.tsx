@@ -24,7 +24,7 @@ export default function PasswordForm() {
    };
 
    return (
-      <form onSubmit={onSubmit} className="space-y-4 max-w-md border p-6 rounded-lg bg-card">
+      <form onSubmit={onSubmit} className="space-y-4 p-6 bg-card rounded-lg border-0 shadow-none">
          <h2 className="text-xl font-semibold">Change Password</h2>
 
          <div className="space-y-2">

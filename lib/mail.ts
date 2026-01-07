@@ -40,7 +40,7 @@ function wrapHtml(title: string, body: string) {
           ${body}
         </div>
         <div class="footer">
-          <p>© ${new Date().getFullYear()} ArrowHeadit. All rights reserved.</p>
+          <p>© ${new Date().getFullYear()} RareviewIt.com. All rights reserved.</p>
         </div>
       </div>
     </body>
@@ -69,14 +69,14 @@ export async function sendWelcomeEmail(to: string, name: string) {
   const from = process.env.SMTP_FROM || "no-reply@example.com";
   const body = `
     <p>Hi <strong>${name}</strong>,</p>
-    <p>Welcome to ArrowHeadit! We are excited to have you on board.</p>
+    <p>Welcome to RareviewIt.com! We are excited to have you on board.</p>
     <p>Your account has been successfully created. You can now explore our platform.</p>
   `;
 
   await transporter.sendMail({
     to,
     from,
-    subject: "Welcome to ArrowHeadit!",
+    subject: "Welcome to RareviewIt.com!",
     html: wrapHtml("Welcome Aboard!", body),
   });
 }

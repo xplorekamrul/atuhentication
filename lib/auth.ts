@@ -41,23 +41,37 @@ export const authOptions: NextAuthOptions = {
         const ok = await bcrypt.compare(password, user.password);
         if (!ok) return null;
 
-        // Log login history (fire and forget)
-        const headers = req?.headers as Record<string, string | string[]> | undefined; // Cast safely
-        const ip = (headers?.["x-forwarded-for"] as string) || (headers?.["x-real-ip"] as string) || null;
-        const ua = (headers?.["user-agent"] as string) || null;
+        // Log login history
+        try {
+          console.log("Attempting to record login history for userId:", user.id);
+          const headers = req?.headers as Record<string, string | string[]> | undefined;
 
-        void prisma.loginHistory.create({
-          data: {
-            userId: user.id,
-            ipAddress: Array.isArray(ip) ? ip[0] : ip, // Handle array case if multiple proxies
-            userAgent: Array.isArray(ua) ? ua[0] : ua,
-          }
-        });
+          let ip = (headers?.["x-forwarded-for"] as string) || (headers?.["x-real-ip"] as string) || "Unknown IP";
+          if (Array.isArray(ip)) ip = ip[0];
+
+          let ua = (headers?.["user-agent"] as string) || "Unknown User Agent";
+          if (Array.isArray(ua)) ua = ua[0];
+
+          console.log("Captured IP:", ip);
+          console.log("Captured UA:", ua);
+
+          await prisma.loginHistory.create({
+            data: {
+              userId: user.id,
+              ipAddress: ip,
+              userAgent: ua,
+            }
+          });
+          console.log("Login history saved successfully.");
+        } catch (error) {
+          console.error("CRITICAL: Failed to record login history.", error);
+        }
 
         const u: User = {
           id: user.id,
           name: user.name ?? null,
           email: user.email,
+          image: user.image,
           role: user.role as "ADMIN" | "SUPER_ADMIN" | "DEVELOPER",
           status: user.status as "ACTIVE" | "INACTIVE" | "SUSPENDED",
         } as User;
@@ -78,10 +92,11 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.role = user.role as "ADMIN" | "SUPER_ADMIN" | "DEVELOPER";
         token.status = user.status as "ACTIVE" | "INACTIVE" | "SUSPENDED";
+        token.picture = user.image;
       } else if (token.email) {
         const dbUser = await prisma.user.findUnique({
           where: { email: token.email },
-          select: { id: true, role: true, status: true, name: true },
+          select: { id: true, role: true, status: true, name: true, image: true },
         });
 
         if (!dbUser) {
@@ -93,6 +108,7 @@ export const authOptions: NextAuthOptions = {
           token.id = dbUser.id;
           token.role = dbUser.role as "ADMIN" | "SUPER_ADMIN" | "DEVELOPER";
           token.status = dbUser.status as "ACTIVE" | "INACTIVE" | "SUSPENDED";
+          token.picture = dbUser.image;
         }
       }
       return token;
@@ -108,6 +124,7 @@ export const authOptions: NextAuthOptions = {
           | "ACTIVE"
           | "INACTIVE"
           | "SUSPENDED";
+        session.user.image = token.picture;
       }
       return session;
     },
