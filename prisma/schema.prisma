@@ -1,6 +1,5 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../app/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -27,8 +26,10 @@ enum Role {
  */
 model User {
   id            String        @id @default(cuid())
-  name          String?
+  name          String
   email         String        @unique
+  username      String        @unique @db.VarChar(50)
+  image         String?
   emailVerified DateTime?     @map("email_verified")
   password      String
   role          Role          @default(ADMIN)
@@ -36,6 +37,36 @@ model User {
   suspendedAt   DateTime?     @map("suspended_at")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  userInfo      UserInfo?
+  loginHistory  LoginHistory[]
+}
+
+model UserInfo {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  dateOfBirth DateTime?
+  phone       String?
+  gender      String?
+  address     String?
+  profession  String?
+  hobbys      String?
+}
+
+model LoginHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  ipAddress String?
+  userAgent String?
+  location  String?
+  
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
 }
 
 model PasswordResetOtp {

@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
 import AuthCard from "@/components/auth/AuthCard";
 import LoginForm from "@/components/auth/LoginForm";
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Login",
@@ -12,7 +12,7 @@ export default async function Page({
   searchParams: Promise<{ callbackUrl?: string }>;
 }) {
   const sp = await searchParams;
-  const callbackUrl = sp?.callbackUrl ?? "/";
+  const callbackUrl = sp?.callbackUrl ?? "/dashboard";
 
   return (
     <main className="min-h-screen bg-light dark:bg-background grid place-items-center px-4">

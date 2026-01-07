@@ -16,6 +16,7 @@ export type UserListQuery = z.infer<typeof userListSchema>;
 
 export const createUserSchema = z.object({
   name: z.string().min(2).max(80),
+  username: z.string().min(2).max(50).transform((u) => u.trim()), // Ensure trimmed
   email: z.string().email().toLowerCase(),
   role: roleEnum,
   password: z.string().min(6),

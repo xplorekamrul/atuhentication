@@ -14,6 +14,7 @@ type Props = {
 
 export default function CreateUserDialog({ open, onOpenChange, onCreated }: Props) {
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>(Role.ADMIN);
   const [pw, setPw] = useState("");
@@ -24,6 +25,7 @@ export default function CreateUserDialog({ open, onOpenChange, onCreated }: Prop
     const errs = (result?.validationErrors ?? {}) as Record<string, string[] | undefined>;
     return {
       name: errs?.name?.[0],
+      username: errs?.username?.[0],
       email: errs?.email?.[0],
       role: errs?.role?.[0],
       password: errs?.password?.[0],
@@ -32,11 +34,11 @@ export default function CreateUserDialog({ open, onOpenChange, onCreated }: Prop
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const res = await executeAsync({ name, email, role, password: pw });
+    const res = await executeAsync({ name, username, email, role, password: pw });
     if (res?.data?.ok) {
       onCreated();
       onOpenChange(false);
-      setName(""); setEmail(""); setRole(Role.ADMIN); setPw("");
+      setName(""); setUsername(""); setEmail(""); setRole(Role.ADMIN); setPw("");
     }
   }
 
@@ -52,6 +54,12 @@ export default function CreateUserDialog({ open, onOpenChange, onCreated }: Prop
             <input className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2"
               value={name} onChange={(e) => setName(e.target.value)} />
             {fieldErrors.name ? <p className="text-xs text-destructive">{fieldErrors.name}</p> : null}
+          </div>
+          <div>
+            <label className="text-sm">Username</label>
+            <input className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2"
+              value={username} onChange={(e) => setUsername(e.target.value)} />
+            {fieldErrors.username ? <p className="text-xs text-destructive">{fieldErrors.username}</p> : null}
           </div>
           <div>
             <label className="text-sm">Email</label>

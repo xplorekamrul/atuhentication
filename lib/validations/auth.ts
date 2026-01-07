@@ -2,13 +2,14 @@ import * as z from "zod";
 
 export const registerSchema = z.object({
   name: z.string().min(2, "Name is required"),
+  username: z.string().min(2, "Username required").max(50, "Max 50 chars").transform(u => u.trim()),
   email: z.string().email("Invalid email").transform((e) => e.toLowerCase().trim()),
   password: z.string().min(6, "At least 6 characters"),
 });
 export type RegisterValues = z.infer<typeof registerSchema>;
 
 export const loginSchema = z.object({
-  email: z.string().email("Invalid email").transform((e) => e.toLowerCase().trim()),
+  email: z.string().min(1, "Email or Username is required").transform((e) => e.trim()),
   password: z.string().min(1, "Password is required"),
 });
 export type LoginValues = z.infer<typeof loginSchema>;

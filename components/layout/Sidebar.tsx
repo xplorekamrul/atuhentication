@@ -1,24 +1,25 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect } from "react";
-import { useSession, signOut } from "next-auth/react";
-import { usePathname, useRouter } from "next/navigation";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import {
-  LayoutDashboard,
-  Gauge,
-  Wrench,
-  Users,
-  Settings,
-  HelpCircle,
-  LogOut,
-  Home,
-  Menu,
-  ChevronLeft,
-} from "lucide-react";
+import { ModeToggle } from "@/components/ui/mode-toggle";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import clsx from "clsx";
+import {
+  ChevronLeft,
+  Gauge,
+  HelpCircle,
+  Home,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Settings,
+  Users,
+  Wrench,
+} from "lucide-react";
+import { signOut, useSession } from "next-auth/react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 type Role = "DEVELOPER" | "SUPER_ADMIN" | "ADMIN";
 
@@ -98,7 +99,7 @@ export default function Sidebar({
         className={clsx(
           "sticky top-0 h-dvh shrink-0 border-r border-border bg-primary/80 backdrop-blur",
           "transition-[width] duration-300 ease-in-out",
-          "w-(--sb-w)" 
+          "w-(--sb-w)"
         )}
         aria-label="Sidebar"
       >
@@ -112,15 +113,19 @@ export default function Sidebar({
           >
             <span className="ml-2 font-semibold text-white">Hr Plus</span>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            onClick={() => onToggle(!collapsed)}
-            className="h-8 w-8 text-white"
-          >
-            {collapsed ? <Menu className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </Button>
+
+          <div className="flex items-center gap-1">
+            {!collapsed && <ModeToggle className="text-white hover:bg-white/20 h-8 w-8" />}
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              onClick={() => onToggle(!collapsed)}
+              className="h-8 w-8 text-white"
+            >
+              {collapsed ? <Menu className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
 
         {/* User */}
@@ -198,6 +203,6 @@ export default function Sidebar({
           )}
         </div>
       </aside>
-    </TooltipProvider>
+    </TooltipProvider >
   );
 }

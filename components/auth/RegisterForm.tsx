@@ -1,15 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useAction } from "next-safe-action/hooks";
 import { register } from "@/actions/auth/register";
-import { signIn } from "next-auth/react";
-import { Eye, EyeOff } from "lucide-react";
 import type { RegisterValues } from "@/lib/validations/auth";
+import { Eye, EyeOff } from "lucide-react";
+import { signIn } from "next-auth/react";
+import { useAction } from "next-safe-action/hooks";
+import { useMemo, useState } from "react";
 
 export default function RegisterForm() {
   const { executeAsync, status, result } = useAction(register);
-  const [form, setForm] = useState<RegisterValues>({ name: "", email: "", password: "" });
+  const [form, setForm] = useState<RegisterValues>({ name: "", username: "", email: "", password: "" });
   const [formError, setFormError] = useState<string | null>(null);
   const [showPw, setShowPw] = useState(false);
 
@@ -17,6 +17,7 @@ export default function RegisterForm() {
     const errs = (result?.validationErrors ?? {}) as Record<string, string[] | undefined>;
     return {
       name: errs?.name?.[0],
+      username: errs?.username?.[0],
       email: errs?.email?.[0],
       password: errs?.password?.[0],
     };
@@ -66,6 +67,29 @@ export default function RegisterForm() {
         />
         {fieldErrors.name ? (
           <p id="name-error" className="text-xs text-destructive">{fieldErrors.name}</p>
+        ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <label htmlFor="username" className="text-sm font-medium text-foreground">
+          Username
+        </label>
+        <input
+          id="username"
+          required
+          value={form.username}
+          onChange={(e) => setForm((s) => ({ ...s, username: e.target.value }))}
+          className="
+            w-full rounded-lg border border-border bg-background px-3 py-2
+            text-foreground placeholder:text-muted-foreground
+            focus:outline-none focus:ring-2 focus:ring-sidebar-ring
+          "
+          placeholder="janedoe"
+          aria-invalid={!!fieldErrors.username}
+          aria-describedby={fieldErrors.username ? "username-error" : undefined}
+        />
+        {fieldErrors.username ? (
+          <p id="username-error" className="text-xs text-destructive">{fieldErrors.username}</p>
         ) : null}
       </div>
 
@@ -150,8 +174,8 @@ export default function RegisterForm() {
         {status === "executing" ? (
           <span className="inline-flex items-center gap-2">
             <svg className="size-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4A4 4 0 008 12H4z"/>
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4A4 4 0 008 12H4z" />
             </svg>
             Creating…
           </span>
