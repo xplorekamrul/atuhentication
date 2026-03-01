@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
 }
 
 /**
@@ -15,68 +15,149 @@ enum AccountStatus {
   SUSPENDED
 }
 
-enum Role {
+/**
+ * ===== auth Models =====
+ */
+
+model User {
+  id            BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  name          String?        @db.VarChar(50)
+  email         String?        @unique @db.VarChar(50)
+  username      String?        @unique @db.VarChar(50)
+  emailVerified DateTime?      @map("email_verified")
+  password      String         @db.VarChar(255)
+  image         String?
+  status        AccountStatus  @default(ACTIVE)
+  suspendedAt   DateTime?      @map("suspended_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  userlevel     userLevel      @default(ADMIN)
+  userRoles     UserRole[]
+  userInfo      UserInfo?
+  loginHistory  LoginHistory[]
+
+  @@index([email], map: "users_email_idx")
+  @@index([username], map: "users_username_idx")
+  @@index([status], map: "users_status_idx")
+  @@map("users")
+}
+
+enum userLevel {
   DEVELOPER
   SUPER_ADMIN
   ADMIN
 }
 
-/**
- * ===== auth Models =====
- */
-model User {
-  id            String        @id @default(cuid())
-  name          String
-  email         String        @unique
-  username      String        @unique @db.VarChar(50)
-  image         String?
-  emailVerified DateTime?     @map("email_verified")
-  password      String
-  role          Role          @default(ADMIN)
-  status        AccountStatus @default(ACTIVE)
-  suspendedAt   DateTime?     @map("suspended_at")
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
+model UserRole {
+  id        BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  userId    BigInt   @map("user_id") @db.UnsignedBigInt
+  roleId    BigInt   @map("role_id") @db.UnsignedBigInt
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
-  userInfo      UserInfo?
-  loginHistory  LoginHistory[]
+  @@unique([userId, roleId])
+  @@index([userId], map: "user_roles_user_id_fkey")
+  @@index([roleId], map: "user_roles_role_id_fkey")
+  @@map("user_roles")
+}
+
+model Role {
+  id              BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  name            String           @unique @db.VarChar(50)
+  userRoles       UserRole[]
+  roleRouteGroups RoleRouteGroup[]
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  @@index([name], map: "roles_name_idx")
+  @@map("roles")
+}
+
+model RouteGroup {
+  id              BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  name            String           @unique @db.VarChar(100)
+  routes          Route[]
+  roleRouteGroups RoleRouteGroup[]
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  @@index([name], map: "route_groups_name_idx")
+  @@map("route_groups")
+}
+
+model Route {
+  id                   BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
+  path                 String     @unique @db.VarChar(255)
+  name                 String?    @db.VarChar(100)
+  groupId              BigInt     @map("group_id") @db.UnsignedBigInt
+  visibleToAdmin       Boolean    @default(true) @map("visible_to_admin")
+  editableByAdmin      Boolean    @default(false) @map("editable_by_admin")
+  visibleToSuperAdmin  Boolean    @default(true) @map("visible_to_super_admin")
+  editableBySuperAdmin Boolean    @default(true) @map("editable_by_super_admin")
+  group                RouteGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdAt            DateTime   @default(now()) @map("created_at")
+
+  @@index([groupId], map: "routes_group_id_fkey")
+  @@index([path], map: "routes_path_idx")
+  @@map("routes")
+}
+
+model RoleRouteGroup {
+  roleId    BigInt     @map("role_id") @db.UnsignedBigInt
+  groupId   BigInt     @map("group_id") @db.UnsignedBigInt
+  role      Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  group     RouteGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  @@id([roleId, groupId])
+  @@index([roleId], map: "role_route_groups_role_id_fkey")
+  @@index([groupId], map: "role_route_groups_group_id_fkey")
+  @@map("role_route_groups")
 }
 
 model UserInfo {
-  id          String    @id @default(cuid())
-  userId      String    @unique
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  userId BigInt @unique @map("user_id") @db.UnsignedBigInt
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   dateOfBirth DateTime?
-  phone       String?
-  gender      String?
-  address     String?
-  profession  String?
-  hobbys      String?
+  phone       String?   @db.VarChar(20)
+  gender      String?   @db.VarChar(10)
+  address     String?   @db.VarChar(255)
+  profession  String?   @db.VarChar(100)
+  hobbys      String?   @db.VarChar(255)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId], map: "user_info_user_id_fkey")
+  @@map("user_info")
 }
 
 model LoginHistory {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  ipAddress String?
-  userAgent String?
-  location  String?
-  
+  id     BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  userId BigInt @map("user_id") @db.UnsignedBigInt
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  ipAddress String?  @db.VarChar(45)
+  userAgent String?  @db.Text
+  location  String?  @db.VarChar(255)
   createdAt DateTime @default(now()) @map("created_at")
 
-  @@index([userId])
+  @@index([userId], map: "login_history_user_id_fkey")
+  @@index([createdAt], map: "login_history_created_at_idx")
+  @@map("login_history")
 }
 
 model PasswordResetOtp {
-  id         String    @id @default(cuid())
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
   email      String    @db.VarChar(255)
-  codeHash   String    @map("code_hash")
+  codeHash   String    @map("code_hash") @db.VarChar(255)
   expiresAt  DateTime  @map("expires_at")
   attempts   Int       @default(0)
   consumedAt DateTime? @map("consumed_at")
   createdAt  DateTime  @default(now()) @map("created_at")
 
-  @@index([email, createdAt])
+  @@unique([email, codeHash])
+  @@index([email], map: "password_reset_otp_email_idx")
+  @@index([expiresAt], map: "password_reset_otp_expires_at_idx")
+  @@map("password_reset_otp")
 }
