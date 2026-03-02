@@ -21,29 +21,29 @@ export async function getEditPermissionForRoute(routePath: string) {
          return false;
       }
 
-      const userId = BigInt(session.user.id);
-      const user = await prisma.user.findUnique({
-         where: { id: userId },
+      const adminId = BigInt(session.user.id);
+      const admin = await prisma.admin.findUnique({
+         where: { id: adminId },
          select: {
-            userlevel: true,
-            userRoles: {
+            level: true,
+            adminRoles: {
                select: { roleId: true },
             },
          },
       });
 
-      if (!user) {
+      if (!admin) {
          return false;
       }
 
       // DEVELOPER has full edit access
-      if (user.userlevel === "DEVELOPER") {
+      if (admin.level === "DEVELOPER") {
          return null; // null means full access
       }
 
       // Get cached route permissions
-      const roleIds = user.userRoles.map((ur) => ur.roleId);
-      return getCachedEditPermission(routePath, user.userlevel, roleIds);
+      const roleIds = admin.adminRoles.map((ar) => ar.roleId);
+      return getCachedEditPermission(routePath, admin.level, roleIds);
    } catch (error) {
       console.error("[getEditPermissionForRoute] Error:", error);
       return false;
@@ -55,7 +55,7 @@ export async function getEditPermissionForRoute(routePath: string) {
  */
 async function getCachedEditPermission(
    routePath: string,
-   userLevel: string,
+   adminLevel: string,
    roleIds: bigint[]
 ) {
    "use cache";
@@ -78,12 +78,12 @@ async function getCachedEditPermission(
    }
 
    // SUPER_ADMIN: check editableBySuperAdmin flag
-   if (userLevel === "SUPER_ADMIN") {
+   if (adminLevel === "SUPER_ADMIN") {
       return route.editableBySuperAdmin ? null : false;
    }
 
    // ADMIN: check editableByAdmin flag AND role access
-   if (userLevel === "ADMIN" && roleIds.length > 0) {
+   if (adminLevel === "ADMIN" && roleIds.length > 0) {
       // First check if route is visible to admin
       if (!route.visibleToAdmin) {
          return false;
@@ -109,7 +109,7 @@ async function getCachedEditPermission(
 }
 
 /**
- * Get all edit permissions for a user across all routes
+ * Get all edit permissions for an admin across all routes
  * Used for bulk permission checks
  */
 export async function getUserEditPermissions() {
@@ -120,28 +120,28 @@ export async function getUserEditPermissions() {
          return new Map<string, boolean>();
       }
 
-      const userId = BigInt(session.user.id);
-      const user = await prisma.user.findUnique({
-         where: { id: userId },
+      const adminId = BigInt(session.user.id);
+      const admin = await prisma.admin.findUnique({
+         where: { id: adminId },
          select: {
-            userlevel: true,
-            userRoles: {
+            level: true,
+            adminRoles: {
                select: { roleId: true },
             },
          },
       });
 
-      if (!user) {
+      if (!admin) {
          return new Map<string, boolean>();
       }
 
       // DEVELOPER has full access to all routes
-      if (user.userlevel === "DEVELOPER") {
+      if (admin.level === "DEVELOPER") {
          return null; // null means full access
       }
 
-      const roleIds = user.userRoles.map((ur) => ur.roleId);
-      return getCachedUserEditPermissions(user.userlevel, roleIds);
+      const roleIds = admin.adminRoles.map((ar) => ar.roleId);
+      return getCachedUserEditPermissions(admin.level, roleIds);
    } catch (error) {
       console.error("[getUserEditPermissions] Error:", error);
       return new Map<string, boolean>();
@@ -149,16 +149,16 @@ export async function getUserEditPermissions() {
 }
 
 /**
- * Cached user edit permissions
+ * Cached admin edit permissions
  */
-async function getCachedUserEditPermissions(userLevel: string, roleIds: bigint[]) {
+async function getCachedUserEditPermissions(adminLevel: string, roleIds: bigint[]) {
    "use cache";
    cacheLife("hours");
-   cacheTag("user-edit-permissions", `level-${userLevel}`);
+   cacheTag("user-edit-permissions", `level-${adminLevel}`);
 
    const permissions = new Map<string, boolean>();
 
-   if (userLevel === "SUPER_ADMIN") {
+   if (adminLevel === "SUPER_ADMIN") {
       // Get all routes editable by super admin
       const routes = await prisma.route.findMany({
          where: { editableBySuperAdmin: true },
@@ -168,8 +168,8 @@ async function getCachedUserEditPermissions(userLevel: string, roleIds: bigint[]
       routes.forEach((route) => {
          permissions.set(route.path, true);
       });
-   } else if (userLevel === "ADMIN" && roleIds.length > 0) {
-      // Get all routes editable by admin in user's roles
+   } else if (adminLevel === "ADMIN" && roleIds.length > 0) {
+      // Get all routes editable by admin in admin's roles
       const routes = await prisma.route.findMany({
          where: {
             editableByAdmin: true,

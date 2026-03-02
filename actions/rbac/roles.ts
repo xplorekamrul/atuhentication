@@ -31,7 +31,7 @@ export const listRoles = developerActionClient
                name: true,
                createdAt: true,
                _count: {
-                  select: { userRoles: true, roleRouteGroups: true },
+                  select: { adminRoles: true, roleRouteGroups: true },
                },
             },
          }),
@@ -117,15 +117,15 @@ export const deleteRole = developerActionClient
          return { ok: false as const, error: "Invalid role ID" };
       }
 
-      // Check if role has users assigned
-      const userCount = await prisma.userRole.count({
+      // Check if role has admins assigned
+      const adminCount = await prisma.adminRole.count({
          where: { roleId },
       });
 
-      if (userCount > 0) {
+      if (adminCount > 0) {
          return {
             ok: false as const,
-            error: `Cannot delete role with ${userCount} user(s) assigned`,
+            error: `Cannot delete role with ${adminCount} admin(s) assigned`,
          };
       }
 

@@ -16,12 +16,12 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Redirect admin users to /admin after successful login
+  // Redirect if already logged in
   useEffect(() => {
-    if (session?.user?.userLvel && ["ADMIN", "SUPER_ADMIN", "DEVELOPER"].includes(session.user.userLvel)) {
-      router.push("/admin");
+    if (session?.user) {
+      router.push(callbackUrl);
     }
-  }, [session, router]);
+  }, [session, router, callbackUrl]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,8 +29,6 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
     setLoading(true);
 
     try {
-      // 1) Create session via NextAuth
-      // We use redirect: false to handle errors in UI, but success leads to manual redirect
       const res = await signIn("credentials", {
         redirect: false,
         email: form.email,
@@ -44,10 +42,16 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
         return;
       }
 
-      // 2) Client-side redirect to the Dispatcher / Dashboard
-      // The dispatcher will handle role-based routing server-side
-      router.push(callbackUrl);
-      router.refresh();
+      if (res?.ok) {
+        // Refresh to get updated session
+        await new Promise(resolve => setTimeout(resolve, 100));
+        router.refresh();
+
+        // Redirect based on user type
+        // If admin, go to /admin, otherwise go to callbackUrl or /
+        const redirectUrl = callbackUrl === "/dashboard" ? "/" : callbackUrl;
+        router.push(redirectUrl);
+      }
     } catch (err) {
       setFormError("Something went wrong.");
       setLoading(false);

@@ -1,7 +1,7 @@
-import { userLevel } from "@prisma/client";
+import { AdminLevel } from "@prisma/client";
 import * as z from "zod";
 
-export const roleEnum = z.nativeEnum(userLevel);
+export const roleEnum = z.nativeEnum(AdminLevel);
 export const statusEnum = z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]);
 
 export const userListSchema = z.object({

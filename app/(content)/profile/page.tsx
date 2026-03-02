@@ -19,7 +19,7 @@ export default async function ProfilePage() {
          email: true,
          username: true,
          image: true,
-         userInfo: true,
+         profile: true,
          loginHistory: {
             take: 10,
             orderBy: { createdAt: "desc" },
@@ -39,12 +39,12 @@ export default async function ProfilePage() {
    };
 
    const userInfoData = {
-      dateOfBirth: user.userInfo?.dateOfBirth?.toISOString() ?? null,
-      phone: user.userInfo?.phone ?? null,
-      gender: user.userInfo?.gender ?? null,
-      address: user.userInfo?.address ?? null,
-      profession: user.userInfo?.profession ?? null,
-      hobbys: user.userInfo?.hobbys ?? null,
+      dateOfBirth: user.profile?.dateOfBirth?.toISOString() ?? null,
+      phone: user.profile?.phone ?? null,
+      gender: user.profile?.gender ?? null,
+      address: user.profile?.address ?? null,
+      profession: user.profile?.profession ?? null,
+      hobbys: user.profile?.hobbys ?? null,
    };
 
    // Ensure non-null history

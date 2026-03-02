@@ -11,42 +11,42 @@ export const updateUserStatus = superAdminActionClient
     const { id, status } = parsedInput;
 
     //Fetch target first
-    const target = await prisma.user.findUnique({
+    const target = await prisma.admin.findUnique({
       where: { id },
-      select: { id: true, userlevel: true, email: true, name: true },
+      select: { id: true, level: true, email: true, name: true },
     });
 
     if (!target) {
-      return { ok: false as const, message: "User not found." };
+      return { ok: false as const, message: "Admin not found." };
     }
 
-    //   do not allow modifying Developer users
-    if (target.userlevel === $Enums.userLevel.DEVELOPER) {
+    //   do not allow modifying Developer admins
+    if (target.level === $Enums.AdminLevel.DEVELOPER) {
       return {
         ok: false as const,
-        message: "Developer users are protected and cannot be modified.",
+        message: "Developer admins are protected and cannot be modified.",
       };
     }
 
 
 
-    const data: Prisma.UserUpdateInput =
+    const data: Prisma.AdminUpdateInput =
       status === "SUSPENDED"
         ? { status: status as $Enums.AccountStatus, suspendedAt: new Date() }
         : { status: status as $Enums.AccountStatus, suspendedAt: null };
 
-    const user = await prisma.user.update({
+    const admin = await prisma.admin.update({
       where: { id },
       data,
       select: {
         id: true,
         name: true,
         email: true,
-        userlevel: true,
+        level: true,
         status: true,
         suspendedAt: true,
       },
     });
 
-    return { ok: true as const, user };
+    return { ok: true as const, user: admin };
   });

@@ -17,7 +17,7 @@ export default async function DashboardPage() {
       redirect("/login");
    }
 
-   const role = (session.user.userLvel || "ADMIN") as Role;
+   const role = (session.user.level || "USER") as Role;
    const target = ROLE_HOME[role] || "/";
 
    redirect(target);

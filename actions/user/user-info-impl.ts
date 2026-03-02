@@ -34,7 +34,7 @@ export const upsertUserInfo = actionClient
          hobbys: parsedInput.hobbys || null,
       };
 
-      await prisma.userInfo.upsert({
+      await prisma.profile.upsert({
          where: { userId },
          update: data,
          create: {

@@ -12,25 +12,25 @@ export type SidebarRoute = {
  * Revalidated every hour or on-demand via tags
  */
 export async function getRoutesWithPermissions() {
-   // Get user info OUTSIDE of cache scope
+   // Get admin info OUTSIDE of cache scope
    const session = await auth();
-   const userId = session?.user?.id ? BigInt(session.user.id) : null;
-   const userLevel = (session?.user as any)?.userlevel as string | undefined;
+   const adminId = session?.user?.id ? BigInt(session.user.id) : null;
+   const adminLevel = (session?.user as any)?.level as string | undefined;
 
    // Get admin accessible groups OUTSIDE of cache scope
    let adminAccessibleGroupIds = new Set<bigint>();
-   if (userLevel === 'ADMIN' && userId) {
-      const user = await prisma.user.findUnique({
-         where: { id: userId },
+   if (adminLevel === 'ADMIN' && adminId) {
+      const admin = await prisma.admin.findUnique({
+         where: { id: adminId },
          select: {
-            userRoles: {
+            adminRoles: {
                select: { roleId: true },
             },
          },
       });
 
-      if (user && user.userRoles && user.userRoles.length > 0) {
-         const roleIds = user.userRoles.map((ur) => ur.roleId);
+      if (admin && admin.adminRoles && admin.adminRoles.length > 0) {
+         const roleIds = admin.adminRoles.map((ar) => ar.roleId);
          const roleRouteGroups = await prisma.roleRouteGroup.findMany({
             where: { roleId: { in: roleIds } },
             select: { groupId: true },
@@ -89,11 +89,11 @@ async function getCachedRoutePermissions(adminAccessibleGroupIds: Set<bigint>) {
 }
 
 /**
- * Filter hardcoded routes based on user level and database permissions
+ * Filter hardcoded routes based on admin level and database permissions
  */
 export async function filterRoutesByPermissions(
    routes: SidebarRoute[],
-   userLevel: 'ADMIN' | 'SUPER_ADMIN' | 'DEVELOPER',
+   adminLevel: 'ADMIN' | 'SUPER_ADMIN' | 'DEVELOPER',
    routePermissions: Map<
       string,
       {
@@ -106,7 +106,7 @@ export async function filterRoutesByPermissions(
    >
 ): Promise<SidebarRoute[]> {
    // DEVELOPER has full access - no filtering
-   if (userLevel === 'DEVELOPER') {
+   if (adminLevel === 'DEVELOPER') {
       return routes;
    }
 
@@ -118,11 +118,11 @@ export async function filterRoutesByPermissions(
          return false;
       }
 
-      if (userLevel === 'SUPER_ADMIN') {
+      if (adminLevel === 'SUPER_ADMIN') {
          return permissions.visibleToSuperAdmin;
       }
 
-      if (userLevel === 'ADMIN') {
+      if (adminLevel === 'ADMIN') {
          // ADMIN users must have: visible flag AND role assigned to the route group
          return permissions.visibleToAdmin && permissions.isAccessibleToAdmin;
       }

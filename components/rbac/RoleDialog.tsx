@@ -17,7 +17,7 @@ type RoleItem = {
    id: string | bigint;
    name: string;
    createdAt: string | Date;
-   _count: { userRoles: number; roleRouteGroups: number };
+   _count: { adminRoles: number; roleRouteGroups: number };
 };
 
 interface RoleDialogProps {

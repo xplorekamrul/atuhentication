@@ -15,7 +15,7 @@ export type RouteWithGroup = {
 };
 
 /**
- * Get accessible routes for the current user
+ * Get accessible routes for the current admin
  * Server-side only - used by components via server actions
  */
 export async function getAccessibleRoutes() {
@@ -26,29 +26,29 @@ export async function getAccessibleRoutes() {
          return null;
       }
 
-      const userId = BigInt(session.user.id);
-      const user = await prisma.user.findUnique({
-         where: { id: userId },
+      const adminId = BigInt(session.user.id);
+      const admin = await prisma.admin.findUnique({
+         where: { id: adminId },
          select: {
-            userlevel: true,
-            userRoles: {
+            level: true,
+            adminRoles: {
                select: { roleId: true },
             },
          },
       });
 
-      if (!user) {
+      if (!admin) {
          return null;
       }
 
       // SUPER_ADMIN and DEVELOPER have full access
-      if (user.userlevel === "SUPER_ADMIN" || user.userlevel === "DEVELOPER") {
+      if (admin.level === "SUPER_ADMIN" || admin.level === "DEVELOPER") {
          return null; // null means full access
       }
 
       // ADMIN users: get routes from their assigned roles + unrestricted paths
-      if (user.userlevel === "ADMIN" && user.userRoles.length > 0) {
-         const roleIds = user.userRoles.map((ur) => ur.roleId);
+      if (admin.level === "ADMIN" && admin.adminRoles.length > 0) {
+         const roleIds = admin.adminRoles.map((ar) => ar.roleId);
          const roleRouteGroups = await prisma.roleRouteGroup.findMany({
             where: { roleId: { in: roleIds } },
             select: {
@@ -90,11 +90,11 @@ export async function getAccessibleRoutes() {
 export async function getAllRoutes(): Promise<RouteWithGroup[]> {
    try {
       const session = await auth();
-      const userlevel = (session?.user as any)?.userlevel as string | undefined;
+      const level = (session?.user as any)?.level as string | undefined;
 
       // For SUPER_ADMIN and DEVELOPER, return hardcoded routes
-      // if (userlevel === "SUPER_ADMIN" || userlevel === "DEVELOPER") {
-      if (userlevel === "DEVELOPER") {
+      // if (level === "SUPER_ADMIN" || level === "DEVELOPER") {
+      if (level === "DEVELOPER") {
          return getHardcodedRoutes();
       }
 

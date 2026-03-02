@@ -10,7 +10,7 @@ export const listUsers = authActionClient
   .action(async ({ parsedInput }) => {
     const { page, pageSize, q, roles, statuses } = parsedInput;
 
-    const and: Prisma.UserWhereInput[] = [];
+    const and: Prisma.AdminWhereInput[] = [];
 
     if (q && q.trim().length) {
       and.push({
@@ -22,17 +22,17 @@ export const listUsers = authActionClient
     }
 
     if (roles && roles.length) {
-      and.push({ userlevel: { in: roles as $Enums.userLevel[] } });
+      and.push({ level: { in: roles as $Enums.AdminLevel[] } });
     }
 
     if (statuses && statuses.length) {
       and.push({ status: { in: statuses as $Enums.AccountStatus[] } });
     }
 
-    const where: Prisma.UserWhereInput = and.length ? { AND: and } : {};
+    const where: Prisma.AdminWhereInput = and.length ? { AND: and } : {};
 
     const [items, total] = await Promise.all([
-      prisma.user.findMany({
+      prisma.admin.findMany({
         where,
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * pageSize,
@@ -41,13 +41,13 @@ export const listUsers = authActionClient
           id: true,
           name: true,
           email: true,
-          userlevel: true,
+          level: true,
           status: true,
           suspendedAt: true,
           createdAt: true,
         },
       }),
-      prisma.user.count({ where }),
+      prisma.admin.count({ where }),
     ]);
 
     return { ok: true as const, items, total, page, pageSize };

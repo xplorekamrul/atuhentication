@@ -15,11 +15,22 @@ enum AccountStatus {
   SUSPENDED
 }
 
+enum AdminLevel {
+  DEVELOPER
+  SUPER_ADMIN
+  ADMIN
+}
+
+enum UserType {
+  ADMIN
+  USER
+}
+
 /**
- * ===== auth Models =====
+ * ===== ADMIN Models =====
  */
 
-model User {
+model Admin {
   id            BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
   name          String?        @db.VarChar(50)
   email         String?        @unique @db.VarChar(50)
@@ -31,41 +42,36 @@ model User {
   suspendedAt   DateTime?      @map("suspended_at")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
-  userlevel     userLevel      @default(ADMIN)
-  userRoles     UserRole[]
-  userInfo      UserInfo?
-  loginHistory  LoginHistory[]
+  level         AdminLevel     @default(ADMIN)
+  userType      UserType       @default(ADMIN)
+  adminRoles    AdminRole[]
+  profile       Profile?       @relation("AdminProfile")
+  loginHistory  LoginHistory[] @relation("AdminLoginHistory")
 
-  @@index([email], map: "users_email_idx")
-  @@index([username], map: "users_username_idx")
-  @@index([status], map: "users_status_idx")
-  @@map("users")
+  @@index([email], map: "admins_email_idx")
+  @@index([username], map: "admins_username_idx")
+  @@index([status], map: "admins_status_idx")
+  @@map("admins")
 }
 
-enum userLevel {
-  DEVELOPER
-  SUPER_ADMIN
-  ADMIN
-}
-
-model UserRole {
+model AdminRole {
   id        BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  userId    BigInt   @map("user_id") @db.UnsignedBigInt
+  adminId   BigInt   @map("admin_id") @db.UnsignedBigInt
   roleId    BigInt   @map("role_id") @db.UnsignedBigInt
   createdAt DateTime @default(now()) @map("created_at")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  admin     Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
   role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, roleId])
-  @@index([userId], map: "user_roles_user_id_fkey")
-  @@index([roleId], map: "user_roles_role_id_fkey")
-  @@map("user_roles")
+  @@unique([adminId, roleId])
+  @@index([adminId], map: "admin_roles_admin_id_fkey")
+  @@index([roleId], map: "admin_roles_role_id_fkey")
+  @@map("admin_roles")
 }
 
 model Role {
   id              BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
   name            String           @unique @db.VarChar(50)
-  userRoles       UserRole[]
+  adminRoles      AdminRole[]
   roleRouteGroups RoleRouteGroup[]
   createdAt       DateTime         @default(now()) @map("created_at")
 
@@ -114,10 +120,42 @@ model RoleRouteGroup {
   @@map("role_route_groups")
 }
 
-model UserInfo {
-  id     BigInt @id @default(autoincrement()) @db.UnsignedBigInt
-  userId BigInt @unique @map("user_id") @db.UnsignedBigInt
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+/**
+ * ===== CUSTOMER/USER Models =====
+ */
+
+model User {
+  id            BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  name          String?        @db.VarChar(50)
+  email         String?        @unique @db.VarChar(50)
+  username      String?        @unique @db.VarChar(50)
+  emailVerified DateTime?      @map("email_verified")
+  password      String         @db.VarChar(255)
+  image         String?
+  status        AccountStatus  @default(ACTIVE)
+  suspendedAt   DateTime?      @map("suspended_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  userType      UserType       @default(USER)
+  profile       Profile?       @relation("UserProfile")
+  loginHistory  LoginHistory[] @relation("UserLoginHistory")
+
+  @@index([email], map: "users_email_idx")
+  @@index([username], map: "users_username_idx")
+  @@index([status], map: "users_status_idx")
+  @@map("users")
+}
+
+/**
+ * ===== Shared Models =====
+ */
+
+model Profile {
+  id      BigInt  @id @default(autoincrement()) @db.UnsignedBigInt
+  adminId BigInt? @unique @map("admin_id") @db.UnsignedBigInt
+  userId  BigInt? @unique @map("user_id") @db.UnsignedBigInt
+  admin   Admin?  @relation("AdminProfile", fields: [adminId], references: [id], onDelete: Cascade)
+  user    User?   @relation("UserProfile", fields: [userId], references: [id], onDelete: Cascade)
 
   dateOfBirth DateTime?
   phone       String?   @db.VarChar(20)
@@ -128,24 +166,32 @@ model UserInfo {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  @@index([userId], map: "user_info_user_id_fkey")
-  @@map("user_info")
+  @@index([adminId], map: "profile_admin_id_fkey")
+  @@index([userId], map: "profile_user_id_fkey")
+  @@map("profiles")
 }
 
 model LoginHistory {
-  id     BigInt @id @default(autoincrement()) @db.UnsignedBigInt
-  userId BigInt @map("user_id") @db.UnsignedBigInt
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id      BigInt  @id @default(autoincrement()) @db.UnsignedBigInt
+  adminId BigInt? @map("admin_id") @db.UnsignedBigInt
+  userId  BigInt? @map("user_id") @db.UnsignedBigInt
+  admin   Admin?  @relation("AdminLoginHistory", fields: [adminId], references: [id], onDelete: Cascade)
+  user    User?   @relation("UserLoginHistory", fields: [userId], references: [id], onDelete: Cascade)
 
   ipAddress String?  @db.VarChar(45)
   userAgent String?  @db.Text
   location  String?  @db.VarChar(255)
   createdAt DateTime @default(now()) @map("created_at")
 
+  @@index([adminId], map: "login_history_admin_id_fkey")
   @@index([userId], map: "login_history_user_id_fkey")
   @@index([createdAt], map: "login_history_created_at_idx")
   @@map("login_history")
 }
+
+/**
+ * ===== Password Reset =====
+ */
 
 model PasswordResetOtp {
   id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt

@@ -46,7 +46,7 @@ function coerceRow(v: unknown): Row | null {
   const id = typeof o.id === "string" ? o.id : null;
   const email = typeof o.email === "string" ? o.email : null;
 
-  const roleRaw = o.userlevel;
+  const roleRaw = o.level;
   const statusRaw = o.status;
 
   const role = isRole(roleRaw) ? roleRaw : null;
@@ -176,8 +176,8 @@ export default function UserTable() {
                     setPage(1);
                   }}
                   className={`px-3 py-1.5 rounded-full border ${roles.includes(r)
-                      ? "bg-primary text-white border-primary"
-                      : "border-border"
+                    ? "bg-primary text-white border-primary"
+                    : "border-border"
                     }`}
                 >
                   {r}
@@ -196,8 +196,8 @@ export default function UserTable() {
                     setPage(1);
                   }}
                   className={`px-3 py-1.5 rounded-full border ${statuses.includes(s)
-                      ? "bg-primary text-white border-primary"
-                      : "border-border"
+                    ? "bg-primary text-white border-primary"
+                    : "border-border"
                     }`}
                 >
                   {s}
@@ -236,10 +236,10 @@ export default function UserTable() {
                   <td className="px-3 py-2">
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs border text-center ${u.status === "ACTIVE"
-                          ? "border-emerald-600 text-emerald-700"
-                          : u.status === "SUSPENDED"
-                            ? "border-red-600 text-red-700"
-                            : "border-amber-600 text-amber-700"
+                        ? "border-emerald-600 text-emerald-700"
+                        : u.status === "SUSPENDED"
+                          ? "border-red-600 text-red-700"
+                          : "border-amber-600 text-amber-700"
                         }`}
                     >
                       {u.status}

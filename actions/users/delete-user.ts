@@ -11,24 +11,24 @@ export const deleteUser = superAdminActionClient
     const { id } = parsedInput;
 
     // Fetch target first
-    const target = await prisma.user.findUnique({
+    const target = await prisma.admin.findUnique({
       where: { id },
-      select: { id: true, userlevel: true, email: true, name: true },
+      select: { id: true, level: true, email: true, name: true },
     });
 
     if (!target) {
-      return { ok: false as const, message: "User not found." };
+      return { ok: false as const, message: "Admin not found." };
     }
 
-    //  do not allow deleting Developer users
-    if (target.userlevel === $Enums.userLevel.DEVELOPER) {
+    //  do not allow deleting Developer admins
+    if (target.level === $Enums.AdminLevel.DEVELOPER) {
       return {
         ok: false as const,
-        message: "Developer users are protected and cannot be deleted.",
+        message: "Developer admins are protected and cannot be deleted.",
       };
     }
 
 
-    await prisma.user.delete({ where: { id } });
+    await prisma.admin.delete({ where: { id } });
     return { ok: true as const };
   });

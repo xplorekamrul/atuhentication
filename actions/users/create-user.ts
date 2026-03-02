@@ -10,7 +10,7 @@ export const createUser = superAdminActionClient
   .action(async ({ parsedInput }) => {
     const { name, username, email, role, password } = parsedInput;
 
-    const exists = await prisma.user.findFirst({
+    const exists = await prisma.admin.findFirst({
       where: {
         OR: [{ email }, { username }],
       },
@@ -22,10 +22,10 @@ export const createUser = superAdminActionClient
     }
 
     const pwd = await hashPassword(password);
-    const user = await prisma.user.create({
-      data: { name, username, email, userlevel: role, password: pwd },
-      select: { id: true, name: true, username: true, email: true, userlevel: true, status: true },
+    const admin = await prisma.admin.create({
+      data: { name, username, email, level: role, password: pwd },
+      select: { id: true, name: true, username: true, email: true, level: true, status: true },
     });
 
-    return { ok: true as const, user };
+    return { ok: true as const, user: admin };
   });

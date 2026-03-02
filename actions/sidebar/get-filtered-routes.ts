@@ -1,8 +1,8 @@
 'use server';
 
 import { auth } from '@/lib/auth';
-import { getUserAccessibleRoutes } from '@/lib/permissions/permissions';
 import { matchesPattern } from '@/lib/permissions/route-pattern-matcher';
+import { prisma } from '@/lib/prisma';
 
 export type NavItemData = {
    label: string;
@@ -15,6 +15,63 @@ export type NavGroupData = {
 };
 
 export type NavNodeData = NavItemData | NavGroupData;
+
+/**
+ * Get all accessible routes from database based on user level and roles
+ * This is cached and revalidated on demand
+ */
+export async function getAccessibleRoutePaths(adminId: bigint, level: string): Promise<string[]> {
+   'use cache';
+
+   // DEVELOPER has full access
+   if (level === 'DEVELOPER') {
+      return []; // Empty array means full access
+   }
+
+   // SUPER_ADMIN: get all visible routes
+   if (level === 'SUPER_ADMIN') {
+      const routes = await prisma.route.findMany({
+         where: { visibleToSuperAdmin: true },
+         select: { path: true },
+      });
+      return routes.map((r) => r.path);
+   }
+
+   // ADMIN: get visible routes from assigned roles
+   if (level === 'ADMIN') {
+      const admin = await prisma.admin.findUnique({
+         where: { id: adminId },
+         select: {
+            adminRoles: {
+               select: { roleId: true },
+            },
+         },
+      });
+
+      if (!admin || admin.adminRoles.length === 0) {
+         return [];
+      }
+
+      const roleIds = admin.adminRoles.map((ar) => ar.roleId);
+      const routes = await prisma.route.findMany({
+         where: {
+            visibleToAdmin: true,
+            group: {
+               roleRouteGroups: {
+                  some: {
+                     roleId: { in: roleIds },
+                  },
+               },
+            },
+         },
+         select: { path: true },
+      });
+
+      return routes.map((r) => r.path);
+   }
+
+   return [];
+}
 
 /**
  * Get filtered sidebar navigation paths based on user level and database permissions
@@ -30,33 +87,36 @@ export async function getFilteredSidebarRoutes(
          return [];
       }
 
-      const userLevel = (session.user as any)?.userLvel as
-         | 'ADMIN'
-         | 'SUPER_ADMIN'
-         | 'DEVELOPER'
-         | undefined;
+      const level = (session.user as any)?.level as string | undefined;
+      const userType = (session.user as any)?.userType as string | undefined;
 
-      if (!userLevel) {
-         console.log('[getFilteredSidebarRoutes] No user level');
+      if (!level || !userType) {
+         console.log('[getFilteredSidebarRoutes] No level or userType');
          return [];
       }
 
-      console.log('[getFilteredSidebarRoutes] User level:', userLevel);
+      console.log('[getFilteredSidebarRoutes] User level:', level, 'userType:', userType);
+
+      // Only admins can access admin routes
+      if (userType !== 'ADMIN') {
+         console.log('[getFilteredSidebarRoutes] Not an admin user');
+         return [];
+      }
 
       // DEVELOPER has full access - no need to check permissions
-      if (userLevel === 'DEVELOPER') {
+      if (level === 'DEVELOPER') {
          console.log('[getFilteredSidebarRoutes] DEVELOPER user - returning all routes');
          return hardcodedRoutes;
       }
 
       // Get accessible routes for ADMIN and SUPER_ADMIN
-      const userId = BigInt(session.user.id);
-      const accessibleRoutes = await getUserAccessibleRoutes(userId);
+      const adminId = BigInt(session.user.id);
+      const accessibleRoutes = await getAccessibleRoutePaths(adminId, level);
 
       console.log('[getFilteredSidebarRoutes] Accessible routes:', accessibleRoutes);
 
-      // If null, user has full access (shouldn't happen for ADMIN/SUPER_ADMIN)
-      if (accessibleRoutes === null) {
+      // If empty array for DEVELOPER, return all routes
+      if (accessibleRoutes.length === 0 && level === 'DEVELOPER') {
          return hardcodedRoutes;
       }
 

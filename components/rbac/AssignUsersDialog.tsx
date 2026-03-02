@@ -20,7 +20,7 @@ type User = {
   name: string | null;
   email: string | null;
   username?: string | null;
-  userlevel: string;
+  level: string;
   status: string;
   suspendedAt?: Date | null;
   createdAt: string | Date;
@@ -67,9 +67,9 @@ export default function AssignUsersDialog({
       }
 
       if (availableResult?.data?.ok) {
-        // Filter out DEVELOPER users
+        // Filter out DEVELOPER admins
         const filtered = availableResult.data.items.filter(
-          (user) => user.userlevel !== "DEVELOPER"
+          (user) => user.level !== "DEVELOPER"
         );
         setAvailableUsers(filtered);
       }
@@ -83,7 +83,7 @@ export default function AssignUsersDialog({
 
     startTransition(async () => {
       const result = await doAssign({
-        userId: normalizeId(user.id),
+        adminId: normalizeId(user.id),
         roleId: normalizeId(role.id),
       });
 
@@ -114,7 +114,7 @@ export default function AssignUsersDialog({
     startTransition(async () => {
       try {
         const result = await doRemove({
-          userId: normalizeId(user.id),
+          adminId: normalizeId(user.id),
           roleId: normalizeId(role.id),
         });
 

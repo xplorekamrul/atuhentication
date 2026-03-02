@@ -11,22 +11,22 @@ export const updateUserInfo = superAdminActionClient
     const { id, name, email } = parsedInput;
 
     // Guard: block modifying Developer accounts
-    const target = await prisma.user.findUnique({
+    const target = await prisma.admin.findUnique({
       where: { id },
-      select: { id: true, userlevel: true },
+      select: { id: true, level: true },
     });
     if (!target) {
-      return { ok: false as const, message: "User not found." };
+      return { ok: false as const, message: "Admin not found." };
     }
-    if (target.userlevel === $Enums.userLevel.DEVELOPER) {
+    if (target.level === $Enums.AdminLevel.DEVELOPER) {
       return {
         ok: false as const,
-        message: "Developer users are protected and cannot be edited.",
+        message: "Developer admins are protected and cannot be edited.",
       };
     }
 
     // Uniqueness check for email
-    const emailUsed = await prisma.user.findFirst({
+    const emailUsed = await prisma.admin.findFirst({
       where: { email, NOT: { id } },
       select: { id: true },
     });
@@ -34,11 +34,11 @@ export const updateUserInfo = superAdminActionClient
       return { ok: false as const, message: "Email already in use by another account." };
     }
 
-    const user = await prisma.user.update({
+    const admin = await prisma.admin.update({
       where: { id },
       data: { name, email },
-      select: { id: true, name: true, email: true, userlevel: true, status: true },
+      select: { id: true, name: true, email: true, level: true, status: true },
     });
 
-    return { ok: true as const, user };
+    return { ok: true as const, user: admin };
   });

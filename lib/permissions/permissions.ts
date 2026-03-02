@@ -1,44 +1,56 @@
 import { prisma } from "@/lib/prisma";
+import developerPages from "./developer-pages.json";
 import { matchesPattern, normalizePath } from "./route-pattern-matcher";
 
 /**
- * Get all accessible routes for a user based on their role and userlevel
+ * Check if a path is developer-only
  */
-export async function getUserAccessibleRoutes(userId: bigint) {
-   const user = await prisma.user.findUnique({
-      where: { id: userId },
+export function isDeveloperOnlyPage(pathname: string): boolean {
+   return developerPages.developerOnlyPages.some(page =>
+      pathname === page || pathname.startsWith(page + "/")
+   );
+}
+
+/**
+ * Get all accessible routes for an admin based on their level and roles
+ */
+export async function getAdminAccessibleRoutes(adminId: bigint) {
+   const admin = await prisma.admin.findUnique({
+      where: { id: adminId },
       select: {
-         userlevel: true,
-         userRoles: {
+         level: true,
+         adminRoles: {
             select: { roleId: true },
          },
       },
    });
 
-   if (!user) return [];
+   if (!admin) return [];
 
    // DEVELOPER has full access
-   if (user.userlevel === "DEVELOPER") {
+   if (admin.level === "DEVELOPER") {
       return null; // null means full access
    }
 
-   // SUPER_ADMIN: get all routes in database (no filtering)
-   if (user.userlevel === "SUPER_ADMIN") {
+   // SUPER_ADMIN: get all visible routes in database
+   if (admin.level === "SUPER_ADMIN") {
       const routes = await prisma.route.findMany({
+         where: { visibleToSuperAdmin: true },
          select: { path: true },
       });
       return routes.map((r) => r.path);
    }
 
-   // ADMIN users: get routes from their assigned roles
-   if (user.userlevel === "ADMIN" && user.userRoles.length > 0) {
-      const roleIds = user.userRoles.map((ur) => ur.roleId);
+   // ADMIN users: get visible routes from their assigned roles
+   if (admin.level === "ADMIN" && admin.adminRoles.length > 0) {
+      const roleIds = admin.adminRoles.map((ar) => ar.roleId);
       const roleRouteGroups = await prisma.roleRouteGroup.findMany({
          where: { roleId: { in: roleIds } },
          select: {
             group: {
                select: {
                   routes: {
+                     where: { visibleToAdmin: true },
                      select: { path: true },
                   },
                },
@@ -60,58 +72,71 @@ export async function getUserAccessibleRoutes(userId: bigint) {
 }
 
 /**
- * Check if a user can access a specific path
- * Supports both exact paths and dynamic route patterns
+ * Check if an admin can access a specific path
  */
-export async function canUserAccessPath(userId: bigint, path: string): Promise<boolean> {
+export async function canAdminAccessPath(adminId: bigint, path: string): Promise<boolean> {
    const normalizedPath = normalizePath(path);
 
-   // Unrestricted paths - accessible to all authenticated users
-   const unrestrictedPaths = ["/help", "/profile"];
+   // Allow /admin base path for all authenticated admins
+   if (normalizedPath === "/admin") {
+      return true;
+   }
+
+   // Unrestricted paths - accessible to all authenticated admins
+   const unrestrictedPaths = ["/admin/profile", "/admin/help"];
    if (unrestrictedPaths.includes(normalizedPath)) {
       return true;
    }
 
-   const user = await prisma.user.findUnique({
-      where: { id: userId },
+   // Developer-only pages - only DEVELOPER level can access
+   if (isDeveloperOnlyPage(normalizedPath)) {
+      const admin = await prisma.admin.findUnique({
+         where: { id: adminId },
+         select: { level: true },
+      });
+      return admin?.level === "DEVELOPER";
+   }
+
+   const admin = await prisma.admin.findUnique({
+      where: { id: adminId },
       select: {
-         userlevel: true,
-         userRoles: {
+         level: true,
+         adminRoles: {
             select: { roleId: true },
          },
       },
    });
 
-   if (!user) return false;
+   if (!admin) return false;
 
    // DEVELOPER has full access
-   if (user.userlevel === "DEVELOPER") {
+   if (admin.level === "DEVELOPER") {
       return true;
    }
 
-   // SUPER_ADMIN: can access any route in database
-   // If route not in database, deny access (redirect to home)
-   if (user.userlevel === "SUPER_ADMIN") {
+   // SUPER_ADMIN: can access any route in database that is visible to super admin
+   if (admin.level === "SUPER_ADMIN") {
       const routes = await prisma.route.findMany({
+         where: { visibleToSuperAdmin: true },
          select: { path: true },
       });
 
       const hasAccess = routes.some((route) => matchesPattern(route.path, normalizedPath));
-      console.log(`[canUserAccessPath] SUPER_ADMIN - Path: ${normalizedPath}, HasAccess: ${hasAccess}`);
+      console.log(`[canAdminAccessPath] SUPER_ADMIN - Path: ${normalizedPath}, HasAccess: ${hasAccess}`);
       return hasAccess;
    }
 
-   // ADMIN users: check if path matches any route in their assigned roles
-   if (user.userlevel === "ADMIN") {
-      // If user has no roles, deny access
-      if (user.userRoles.length === 0) {
-         console.log(`[canUserAccessPath] ADMIN without roles - Path: ${normalizedPath}, HasAccess: false`);
+   // ADMIN users: check if path matches any route in their assigned roles AND is visible to admin
+   if (admin.level === "ADMIN") {
+      if (admin.adminRoles.length === 0) {
+         console.log(`[canAdminAccessPath] ADMIN without roles - Path: ${normalizedPath}, HasAccess: false`);
          return false;
       }
 
-      const roleIds = user.userRoles.map((ur) => ur.roleId);
+      const roleIds = admin.adminRoles.map((ar) => ar.roleId);
       const routes = await prisma.route.findMany({
          where: {
+            visibleToAdmin: true,
             group: {
                roleRouteGroups: {
                   some: {
@@ -124,7 +149,7 @@ export async function canUserAccessPath(userId: bigint, path: string): Promise<b
       });
 
       const hasAccess = routes.some((route) => matchesPattern(route.path, normalizedPath));
-      console.log(`[canUserAccessPath] ADMIN - Path: ${normalizedPath}, Routes: ${routes.map(r => r.path).join(', ')}, HasAccess: ${hasAccess}`);
+      console.log(`[canAdminAccessPath] ADMIN - Path: ${normalizedPath}, Routes: ${routes.map(r => r.path).join(', ')}, HasAccess: ${hasAccess}`);
       return hasAccess;
    }
 
@@ -132,94 +157,28 @@ export async function canUserAccessPath(userId: bigint, path: string): Promise<b
 }
 
 /**
- * Get route groups for a user's roles
+ * Check if an admin can edit a specific route
  */
-export async function getUserRouteGroups(userId: bigint) {
-   const user = await prisma.user.findUnique({
-      where: { id: userId },
+export async function canAdminEditRoute(adminId: bigint, routePath: string): Promise<boolean> {
+   const admin = await prisma.admin.findUnique({
+      where: { id: adminId },
       select: {
-         userlevel: true,
-         userRoles: {
+         level: true,
+         adminRoles: {
             select: { roleId: true },
          },
       },
    });
 
-   if (!user) return [];
-
-   // DEVELOPER has access to all route groups
-   if (user.userlevel === "DEVELOPER") {
-      return null; // null means all route groups
-   }
-
-   // SUPER_ADMIN: get all route groups
-   if (user.userlevel === "SUPER_ADMIN") {
-      const groups = await prisma.routeGroup.findMany({
-         select: {
-            id: true,
-            name: true,
-            routes: {
-               select: {
-                  id: true,
-                  path: true,
-               },
-            },
-         },
-      });
-      return groups;
-   }
-
-   // ADMIN users: get their assigned route groups
-   if (user.userlevel === "ADMIN" && user.userRoles.length > 0) {
-      const roleIds = user.userRoles.map((ur) => ur.roleId);
-      const roleRouteGroups = await prisma.roleRouteGroup.findMany({
-         where: { roleId: { in: roleIds } },
-         select: {
-            group: {
-               select: {
-                  id: true,
-                  name: true,
-                  routes: {
-                     select: {
-                        id: true,
-                        path: true,
-                     },
-                  },
-               },
-            },
-         },
-      });
-
-      return roleRouteGroups.map((rrg) => rrg.group);
-   }
-
-   return [];
-}
-
-/**
- * Check if a user can edit a specific route
- * Returns true if user has edit permission, false if only view permission
- */
-export async function canUserEditRoute(userId: bigint, routePath: string): Promise<boolean> {
-   const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-         userlevel: true,
-         userRoles: {
-            select: { roleId: true },
-         },
-      },
-   });
-
-   if (!user) return false;
+   if (!admin) return false;
 
    // DEVELOPER has full edit access
-   if (user.userlevel === "DEVELOPER") {
+   if (admin.level === "DEVELOPER") {
       return true;
    }
 
    // SUPER_ADMIN: can edit any route in database
-   if (user.userlevel === "SUPER_ADMIN") {
+   if (admin.level === "SUPER_ADMIN") {
       const route = await prisma.route.findUnique({
          where: { path: routePath },
          select: { id: true },
@@ -229,8 +188,8 @@ export async function canUserEditRoute(userId: bigint, routePath: string): Promi
    }
 
    // ADMIN: check if route is in their assigned groups
-   if (user.userlevel === "ADMIN" && user.userRoles.length > 0) {
-      const roleIds = user.userRoles.map((ur) => ur.roleId);
+   if (admin.level === "ADMIN" && admin.adminRoles.length > 0) {
+      const roleIds = admin.adminRoles.map((ar) => ar.roleId);
       const route = await prisma.route.findUnique({
          where: { path: routePath },
          select: {
@@ -242,7 +201,6 @@ export async function canUserEditRoute(userId: bigint, routePath: string): Promi
          return false;
       }
 
-      // Check if admin has access to this route's group through any of their roles
       const hasGroupAccess = await prisma.roleRouteGroup.findFirst({
          where: {
             roleId: { in: roleIds },

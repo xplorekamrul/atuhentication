@@ -21,7 +21,7 @@ type RoleItem = {
    id: string | bigint;
    name: string;
    createdAt: string | Date;
-   _count: { userRoles: number; roleRouteGroups: number };
+   _count: { adminRoles: number; roleRouteGroups: number };
 };
 
 type RoleData = {
@@ -218,7 +218,7 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
                                  <td className="px-4 py-3 font-medium">{role.name}</td>
                                  <td className="px-4 py-3">
                                     <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                                       {role._count.userRoles}
+                                       {role._count.adminRoles}
                                     </span>
                                  </td>
                                  <td className="px-4 py-3">

@@ -17,10 +17,10 @@ export default function RegisterForm() {
   const [formError, setFormError] = useState<string | null>(null);
   const [showPw, setShowPw] = useState(false);
 
-  // Redirect admin users to /admin after successful registration
+  // Redirect if already logged in
   useEffect(() => {
-    if (session?.user?.userLvel && ["ADMIN", "SUPER_ADMIN", "DEVELOPER"].includes(session.user.userLvel)) {
-      router.push("/admin");
+    if (session?.user) {
+      router.push("/");
     }
   }, [session, router]);
 
@@ -47,12 +47,8 @@ export default function RegisterForm() {
         password: form.password,
       });
       if (!loginRes?.error) {
-        // Check if user is admin, redirect to /admin, otherwise to home
-        if (session?.user?.userLvel && ["ADMIN", "SUPER_ADMIN", "DEVELOPER"].includes(session.user.userLvel)) {
-          router.push("/admin");
-        } else {
-          window.location.href = "/";
-        }
+        // User registered and logged in successfully
+        router.push("/");
       } else {
         setFormError(loginRes.error || "Login failed after registration.");
       }
