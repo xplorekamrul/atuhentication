@@ -50,6 +50,12 @@ export async function proxy(req: NextRequest) {
       return NextResponse.redirect(url);
     };
 
+    const redirectToAdminHome = () => {
+      url.pathname = "/admin";
+      url.searchParams.delete("callbackUrl");
+      return NextResponse.redirect(url);
+    };
+
     // Handle login pages
     if (pathname === "/login") {
       if (session?.user) {
@@ -111,12 +117,12 @@ export async function proxy(req: NextRequest) {
         const hasAccess = await canAdminAccessPath(userId, pathname);
         console.log('[proxy] Admin access check:', hasAccess);
         if (!hasAccess) {
-          return redirectToHome();
+          return redirectToAdminHome();
         }
         return NextResponse.next();
       }
 
-      return redirectToHome();
+      return redirectToAdminHome();
     }
 
     return NextResponse.next();

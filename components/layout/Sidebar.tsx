@@ -10,7 +10,6 @@ import {
   ChevronUp,
   HelpCircle,
   Home,
-  List as ListIcon,
   LogOut,
   Menu,
   ShieldAlert,
@@ -49,7 +48,7 @@ function initials(name?: string | null, email?: string | null) {
 const hardcodedNav: LocalNavNode[] = [
   { label: "Users", href: "/admin/users", icon: Users },
   { label: "RBAC", href: "/admin/rbac", icon: ShieldAlert },
-  
+
   // {
   //   label: "Employee MGT",
   //   icon: Users,
@@ -118,6 +117,7 @@ export default function Sidebar({
   const [items, setItems] = useState<LocalNavNode[]>([]);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [noRoutesInDatabase, setNoRoutesInDatabase] = useState(false);
   const navRef = useRef<HTMLElement>(null);
 
   // Fetch and filter routes based on permissions
@@ -142,15 +142,17 @@ export default function Sidebar({
           };
         });
 
-        const filtered = await getFilteredSidebarRoutes(hardcodedNavData);
-        console.log('Filtered routes:', filtered);
+        const result = await getFilteredSidebarRoutes(hardcodedNavData);
+        console.log('Filtered routes result:', result);
+
+        setNoRoutesInDatabase(result.noRoutesInDatabase);
 
         // Reconstruct with icons on client side
-        const reconstructed = reconstructWithIcons(filtered);
+        const reconstructed = reconstructWithIcons(result.routes);
         console.log('Reconstructed routes:', reconstructed);
 
         // If no routes returned but user exists, use all routes (fallback for DEVELOPER)
-        if (reconstructed.length === 0 && user) {
+        if (reconstructed.length === 0 && user && !result.noRoutesInDatabase) {
           console.log('No routes returned, using all hardcoded routes as fallback');
           const allReconstructed = reconstructWithIcons(hardcodedNavData);
           setItems(allReconstructed);
@@ -305,6 +307,12 @@ export default function Sidebar({
               {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="h-8 bg-white/10 rounded animate-pulse" />
               ))}
+            </div>
+          ) : noRoutesInDatabase ? (
+            <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+              <ShieldAlert className="h-8 w-8 text-white/40 mb-3" />
+              <p className="text-sm text-white/60">No routes available in database</p>
+              <p className="text-xs text-white/40 mt-1">Contact administrator to configure routes</p>
             </div>
           ) : (
             <div className="flex flex-col gap-1">

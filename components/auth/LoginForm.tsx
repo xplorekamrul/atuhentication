@@ -43,14 +43,18 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
       }
 
       if (res?.ok) {
-        // Refresh to get updated session
-        await new Promise(resolve => setTimeout(resolve, 100));
-        router.refresh();
+        // Wait for session to be updated
+        await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Redirect based on user type
-        // If admin, go to /admin, otherwise go to callbackUrl or /
-        const redirectUrl = callbackUrl === "/dashboard" ? "/" : callbackUrl;
-        router.push(redirectUrl);
+        // Get the updated session
+        const updatedSession = await fetch("/api/auth/session").then(r => r.json());
+
+        if (updatedSession?.user?.userType === "ADMIN") {
+          router.push("/admin");
+        } else {
+          const redirectUrl = callbackUrl === "/dashboard" ? "/" : callbackUrl;
+          router.push(redirectUrl);
+        }
       }
     } catch (err) {
       setFormError("Something went wrong.");

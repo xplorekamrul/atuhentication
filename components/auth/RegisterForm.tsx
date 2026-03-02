@@ -48,7 +48,17 @@ export default function RegisterForm() {
       });
       if (!loginRes?.error) {
         // User registered and logged in successfully
-        router.push("/");
+        // Wait for session to be updated
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Check the session to determine redirect
+        const session = await fetch("/api/auth/session").then(r => r.json());
+
+        if (session?.user?.userType === "ADMIN") {
+          router.push("/admin");
+        } else {
+          router.push("/");
+        }
       } else {
         setFormError(loginRes.error || "Login failed after registration.");
       }

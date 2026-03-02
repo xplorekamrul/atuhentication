@@ -128,6 +128,7 @@ export async function canAdminAccessPath(adminId: bigint, path: string): Promise
 
    // ADMIN users: check if path matches any route in their assigned roles AND is visible to admin
    if (admin.level === "ADMIN") {
+      // If no roles assigned, they can still access /admin base path (already handled above)
       if (admin.adminRoles.length === 0) {
          console.log(`[canAdminAccessPath] ADMIN without roles - Path: ${normalizedPath}, HasAccess: false`);
          return false;
