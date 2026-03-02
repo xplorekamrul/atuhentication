@@ -1,32 +1,11 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
+import { canUserAccessPath } from "@/lib/permissions/permissions";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
-const ROLE_ADMIN = "ADMIN";
-const ROLE_SUPER = "SUPER_ADMIN";
-const ROLE_DEV = "DEVELOPER";
-
-const isUnder = (pathname: string, base: string) =>
-  pathname === base || pathname.startsWith(base + "/");
-
-const getRoleHomePath = (role?: string) => {
-  switch (role) {
-    case ROLE_DEV:
-      return "/developer";
-    case ROLE_SUPER:
-      return "/super-admin";
-    case ROLE_ADMIN:
-      return "/admin";
-    default:
-      return "/";
-  }
-};
-
-const redirectToHome = (url: URL, role?: string) => {
-  url.pathname = getRoleHomePath(role);
-  url.searchParams.delete("callbackUrl");
-  return NextResponse.redirect(url);
-};
+const LEVEL_ADMIN = "ADMIN";
+const LEVEL_SUPER = "SUPER_ADMIN";
+const LEVEL_DEV = "DEVELOPER";
 
 export async function proxy(req: NextRequest) {
   const url = req.nextUrl.clone();
@@ -34,14 +13,16 @@ export async function proxy(req: NextRequest) {
 
   // Public routes – no auth required
   const publicPrefixes = [
-    "/",
-    "/login",
-    "/register",
     "/api/auth",
+    "/iclock/cdata",
     "/favicon.ico",
     "/_next",
     "/assets",
     "/public",
+    "/forgot",
+    "/register",
+    "/login",
+
   ];
 
   for (const p of publicPrefixes) {
@@ -50,56 +31,93 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  // Get session + role for all protected routes
-  const session = await auth();
-  const role = (session?.user as any)?.role as string | undefined;
+  // Get session + userlevel for all protected routes
+  try {
+    const session = await auth();
+    const userlevel = (session?.user as any)?.userLvel as string | undefined;
+    const userId = session?.user?.id ? BigInt(session.user.id) : null;
 
-  const requireLogin = (redirectTo = "/login") => {
-    url.pathname = redirectTo;
-    url.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(url);
-  };
+    // console.log('[proxy] Session user:', session?.user?.email, 'userlevel:', userlevel);
 
-  // If someone manually goes to /unauthorized, send them to their home page
-  if (pathname === "/unauthorized") {
-    if (!session?.user) return requireLogin();
-    return redirectToHome(url, role);
-  }
+    const requireLogin = (redirectTo = "/login") => {
+      url.pathname = redirectTo;
+      url.searchParams.set("callbackUrl", pathname);
+      return NextResponse.redirect(url);
+    };
 
-  // /developer → only DEVELOPER
-  if (isUnder(pathname, "/developer")) {
-    if (!session?.user) return requireLogin();
-    if (role !== ROLE_DEV) {
-      // Not allowed here → send them to their own section (/admin, /super-admin, etc.)
-      return redirectToHome(url, role);
+    const redirectToUnauthorized = () => {
+      url.pathname = "/unauthorized";
+      url.searchParams.delete("callbackUrl");
+      return NextResponse.redirect(url);
+    };
+
+    // Handle login page - redirect authenticated users to home
+    if (pathname === "/login") {
+      if (session?.user) {
+        url.pathname = "/";
+        url.searchParams.delete("callbackUrl");
+        return NextResponse.redirect(url);
+      }
+      return NextResponse.next();
     }
+
+    // Handle root path - allow access, the page itself will handle user level display
+    if (pathname === "/") {
+      if (!session?.user) {
+        // Unauthenticated user - redirect to login
+        return requireLogin();
+      }
+      // Authenticated user - allow access to home page
+      return NextResponse.next();
+    }
+
+    // If someone manually goes to /unauthorized, send them to home page
+    if (pathname === "/unauthorized") {
+      if (!session?.user) return requireLogin();
+      url.pathname = "/";
+      url.searchParams.delete("callbackUrl");
+      return NextResponse.redirect(url);
+    }
+
+    // All other routes require authentication
+    if (!session?.user) {
+      return requireLogin();
+    }
+
+    // DEVELOPER has full access to all routes
+    if (userlevel === LEVEL_DEV) {
+      return NextResponse.next();
+    }
+
+    // SUPER_ADMIN and ADMIN users: check permissions based on route visibility
+    if ((userlevel === LEVEL_SUPER || userlevel === LEVEL_ADMIN) && userId) {
+      const hasAccess = await canUserAccessPath(userId, pathname);
+      if (!hasAccess) {
+        return redirectToUnauthorized();
+      }
+      return NextResponse.next();
+    }
+
+    // Default: deny access
+    return redirectToUnauthorized();
+  } catch (error) {
+    console.error("Proxy error:", error);
+    // If there's an error getting the session, allow the request to continue
     return NextResponse.next();
   }
-
-  // /super-admin → SUPER_ADMIN and DEVELOPER
-  if (isUnder(pathname, "/super-admin")) {
-    if (!session?.user) return requireLogin();
-    if (role === ROLE_SUPER || role === ROLE_DEV) {
-      return NextResponse.next();
-    }
-    // Admin / other roles not allowed → home
-    return redirectToHome(url, role);
-  }
-
-  // /admin → ADMIN, SUPER_ADMIN, DEVELOPER
-  if (isUnder(pathname, "/admin")) {
-    if (!session?.user) return requireLogin();
-    if (role === ROLE_ADMIN || role === ROLE_SUPER || role === ROLE_DEV) {
-      return NextResponse.next();
-    }
-    return redirectToHome(url, role);
-  }
-
-  // Everything else – allow
-  return NextResponse.next();
 }
 
 // IMPORTANT: matcher must match your actual route prefixes
 export const config = {
-  matcher: ["/admin/:path*", "/super-admin/:path*", "/developer/:path*", "/unauthorized"],
+  matcher: [
+    /**
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    "/((?!api|_next/static|_next/image|favicon.ico|public).*)",
+  ],
 };

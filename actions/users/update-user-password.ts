@@ -14,12 +14,12 @@ export const updateUserPassword = superAdminActionClient
     // Guard: block modifying Developer accounts
     const target = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, role: true },
+      select: { id: true, userlevel: true },
     });
     if (!target) {
       return { ok: false as const, message: "User not found." };
     }
-    if (target.role === $Enums.Role.DEVELOPER) {
+    if (target.userlevel === $Enums.userLevel.DEVELOPER) {
       return {
         ok: false as const,
         message: "Developer users are protected and their password cannot be changed.",

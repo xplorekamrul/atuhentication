@@ -13,7 +13,7 @@ export const deleteUser = superAdminActionClient
     // Fetch target first
     const target = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, role: true, email: true, name: true },
+      select: { id: true, userlevel: true, email: true, name: true },
     });
 
     if (!target) {
@@ -21,7 +21,7 @@ export const deleteUser = superAdminActionClient
     }
 
     //  do not allow deleting Developer users
-    if (target.role === $Enums.Role.DEVELOPER) {
+    if (target.userlevel === $Enums.userLevel.DEVELOPER) {
       return {
         ok: false as const,
         message: "Developer users are protected and cannot be deleted.",

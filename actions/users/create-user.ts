@@ -23,8 +23,8 @@ export const createUser = superAdminActionClient
 
     const pwd = await hashPassword(password);
     const user = await prisma.user.create({
-      data: { name, username, email, role, password: pwd },
-      select: { id: true, name: true, username: true, email: true, role: true, status: true },
+      data: { name, username, email, userlevel: role, password: pwd },
+      select: { id: true, name: true, username: true, email: true, userlevel: true, status: true },
     });
 
     return { ok: true as const, user };

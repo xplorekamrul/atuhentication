@@ -15,7 +15,7 @@ export const superAdminActionClient = actionClient.use(async ({ next }) => {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
 
-  const role = session.user.role;
+  const role = session.user.userLvel;
 
   // DEVELOPER can access all actions (no restrictions)
   if (role === "DEVELOPER") {
@@ -34,7 +34,7 @@ export const adminActionClient = actionClient.use(async ({ next }) => {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
 
-  const role = session.user.role;
+  const role = session.user.userLvel;
 
   // DEVELOPER can access all actions (no restrictions)
   if (role === "DEVELOPER") {
@@ -58,7 +58,7 @@ export const developerActionClient = actionClient.use(async ({ next }) => {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
 
-  const role = session.user.role;
+  const role = session.user.userLvel;
 
   // Only DEVELOPER can access developer actions
   if (role !== "DEVELOPER") {

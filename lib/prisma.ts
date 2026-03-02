@@ -1,34 +1,25 @@
-// src/lib/prisma.ts
-import { PrismaClient } from '@prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
-import { Pool } from 'pg'
+import 'dotenv/config';
+import { PrismaMariaDb } from '@prisma/adapter-mariadb';
+import { PrismaClient } from '@prisma/client';
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL is not set in environment variables')
-}
-
-// 1. Create a connection pool using the 'pg' driver
-const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-
-// 2. Initialize the Prisma adapter
-const adapter = new PrismaPg(pool)
+let prisma: PrismaClient;
 
 const globalForPrisma = globalThis as unknown as {
-  prisma?: PrismaClient
+    prisma?: PrismaClient;
+};
+
+if (!globalForPrisma.prisma) {
+    const adapter = new PrismaMariaDb({
+        host: process.env.MARIADB_HOST || 'localhost',
+        port: Number(process.env.MARIADB_PORT) || 3306,
+        user: process.env.MARIADB_USER || 'root',
+        password: process.env.MARIADB_PASSWORD || '',
+        database: process.env.MARIADB_DATABASE || 'obokash',
+    });
+
+    globalForPrisma.prisma = new PrismaClient({ adapter });
 }
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    adapter, // 3. Pass the adapter here
-    log:
-      process.env.NODE_ENV === 'development'
-        ? ['query', 'error', 'warn']
-        : ['error', 'warn'],
-  })
+prisma = globalForPrisma.prisma;
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-}
-
-export default prisma
+export { prisma };

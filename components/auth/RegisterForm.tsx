@@ -3,15 +3,26 @@
 import { register } from "@/actions/auth/register";
 import type { RegisterValues } from "@/lib/validations/auth";
 import { Eye, EyeOff } from "lucide-react";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { useAction } from "next-safe-action/hooks";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "../ui/button";
 
 export default function RegisterForm() {
+  const router = useRouter();
+  const { data: session } = useSession();
   const { executeAsync, status, result } = useAction(register);
   const [form, setForm] = useState<RegisterValues>({ name: "", username: "", email: "", password: "" });
   const [formError, setFormError] = useState<string | null>(null);
   const [showPw, setShowPw] = useState(false);
+
+  // Redirect admin users to /admin after successful registration
+  useEffect(() => {
+    if (session?.user?.userLvel && ["ADMIN", "SUPER_ADMIN", "DEVELOPER"].includes(session.user.userLvel)) {
+      router.push("/admin");
+    }
+  }, [session, router]);
 
   const fieldErrors = useMemo(() => {
     const errs = (result?.validationErrors ?? {}) as Record<string, string[] | undefined>;
@@ -36,7 +47,12 @@ export default function RegisterForm() {
         password: form.password,
       });
       if (!loginRes?.error) {
-        window.location.href = "/";
+        // Check if user is admin, redirect to /admin, otherwise to home
+        if (session?.user?.userLvel && ["ADMIN", "SUPER_ADMIN", "DEVELOPER"].includes(session.user.userLvel)) {
+          router.push("/admin");
+        } else {
+          window.location.href = "/";
+        }
       } else {
         setFormError(loginRes.error || "Login failed after registration.");
       }
@@ -160,13 +176,13 @@ export default function RegisterForm() {
 
       {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
 
-      <button
+      <Button
         type="submit"
         disabled={status === "executing"}
         className="
           w-full inline-flex items-center justify-center gap-2
-          rounded-lg bg-pcolor text-white py-2.5
-          hover:bg-scolor transition-colors
+          rounded-lg bg-primary text-white py-2.5
+          hover:bg-primary/80 transition-colors
           disabled:opacity-60
           focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sidebar-ring
         "
@@ -182,7 +198,7 @@ export default function RegisterForm() {
         ) : (
           "Create account"
         )}
-      </button>
+      </Button>
 
       <p className="text-sm text-center text-muted-foreground">
         Already have an account?{" "}

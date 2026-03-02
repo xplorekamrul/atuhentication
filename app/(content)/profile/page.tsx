@@ -13,7 +13,7 @@ export default async function ProfilePage() {
    }
 
    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: BigInt(session.user.id) },
       select: {
          name: true,
          email: true,
@@ -33,7 +33,7 @@ export default async function ProfilePage() {
 
    const userData = {
       name: user.name ?? "",
-      email: user.email,
+      email: user.email ?? "",
       username: user.username ?? "",
       image: user.image,
    };
@@ -49,7 +49,7 @@ export default async function ProfilePage() {
 
    // Ensure non-null history
    const loginHistoryData = (user.loginHistory ?? []).map((h) => ({
-      id: h.id,
+      id: h.id.toString(),
       ipAddress: h.ipAddress,
       userAgent: h.userAgent,
       location: h.location,

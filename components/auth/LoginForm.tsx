@@ -2,17 +2,26 @@
 
 import type { LoginValues } from "@/lib/validations/auth";
 import { Eye, EyeOff } from "lucide-react";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Button } from "../ui/button";
 
 export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?: string }) {
   const router = useRouter();
+  const { data: session } = useSession();
   const [form, setForm] = useState<LoginValues>({ email: "", password: "" });
   const [showPw, setShowPw] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Redirect admin users to /admin after successful login
+  useEffect(() => {
+    if (session?.user?.userLvel && ["ADMIN", "SUPER_ADMIN", "DEVELOPER"].includes(session.user.userLvel)) {
+      router.push("/admin");
+    }
+  }, [session, router]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,13 +124,13 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
 
       {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
 
-      <button
+      <Button
         type="submit"
         disabled={loading}
         className="
           w-full inline-flex items-center justify-center gap-2
-          rounded-lg bg-pcolor text-white py-2.5
-          hover:bg-scolor transition-colors
+          rounded-lg bg-primary text-white py-2.5!
+          hover:bg-primary/80 transition-colors
           disabled:opacity-60
           focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sidebar-ring
         "
@@ -137,7 +146,7 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
         ) : (
           "Sign in"
         )}
-      </button>
+      </Button>
 
       <p className="text-sm text-center text-muted-foreground">
         No account?{" "}

@@ -46,7 +46,7 @@ function coerceRow(v: unknown): Row | null {
   const id = typeof o.id === "string" ? o.id : null;
   const email = typeof o.email === "string" ? o.email : null;
 
-  const roleRaw = o.role;
+  const roleRaw = o.userlevel;
   const statusRaw = o.status;
 
   const role = isRole(roleRaw) ? roleRaw : null;
@@ -175,11 +175,10 @@ export default function UserTable() {
                     setRoles((prev) => toggle(prev, r));
                     setPage(1);
                   }}
-                  className={`px-3 py-1.5 rounded-full border ${
-                    roles.includes(r)
+                  className={`px-3 py-1.5 rounded-full border ${roles.includes(r)
                       ? "bg-primary text-white border-primary"
                       : "border-border"
-                  }`}
+                    }`}
                 >
                   {r}
                 </button>
@@ -196,11 +195,10 @@ export default function UserTable() {
                     setStatuses((prev) => toggle(prev, s));
                     setPage(1);
                   }}
-                  className={`px-3 py-1.5 rounded-full border ${
-                    statuses.includes(s)
+                  className={`px-3 py-1.5 rounded-full border ${statuses.includes(s)
                       ? "bg-primary text-white border-primary"
                       : "border-border"
-                  }`}
+                    }`}
                 >
                   {s}
                 </button>
@@ -237,13 +235,12 @@ export default function UserTable() {
                   <td className="px-3 py-2">{u.role}</td>
                   <td className="px-3 py-2">
                     <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs border text-center ${
-                        u.status === "ACTIVE"
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs border text-center ${u.status === "ACTIVE"
                           ? "border-emerald-600 text-emerald-700"
                           : u.status === "SUSPENDED"
-                          ? "border-red-600 text-red-700"
-                          : "border-amber-600 text-amber-700"
-                      }`}
+                            ? "border-red-600 text-red-700"
+                            : "border-amber-600 text-amber-700"
+                        }`}
                     >
                       {u.status}
                     </span>

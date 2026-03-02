@@ -1,27 +1,25 @@
 "use client";
 
+import { getFilteredSidebarRoutes } from "@/actions/sidebar/get-filtered-routes";
 import { Button } from "@/components/ui/button";
-import { ModeToggle } from "@/components/ui/mode-toggle";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import clsx from "clsx";
 import {
+  ChevronDown,
   ChevronLeft,
-  Gauge,
+  ChevronUp,
   HelpCircle,
   Home,
-  LayoutDashboard,
+  List as ListIcon,
   LogOut,
   Menu,
-  Settings,
-  Users,
-  Wrench,
+  ShieldAlert,
+  Users
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
-
-type Role = "DEVELOPER" | "SUPER_ADMIN" | "ADMIN";
+import { useEffect, useRef, useState } from "react";
 
 type Item = {
   label: string;
@@ -29,25 +27,82 @@ type Item = {
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 };
 
+type Group = {
+  label: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  children: Item[];
+};
+
+type LocalNavNode = Item | Group;
+
+function isGroup(n: LocalNavNode): n is Group {
+  return (n as Group).children !== undefined;
+}
+
 function initials(name?: string | null, email?: string | null) {
   const base = (name || email || "U").trim();
   const parts = base.split(/\s+/).slice(0, 2);
   return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "U";
 }
 
-const commonNav: Item[] = [{ label: "Home", href: "/", icon: Home }];
+// Hardcoded navigation structure with icons
+const hardcodedNav: LocalNavNode[] = [
+  { label: "Users", href: "/admin/users", icon: Users },
+  { label: "RBAC", href: "/admin/rbac", icon: ShieldAlert },
+  
+  // {
+  //   label: "Employee MGT",
+  //   icon: Users,
+  //   children: [
+  //     { label: "Employee List", href: "/employees", icon: ListIcon },
+  //     { label: "Roster MGT", href: "/employees/roster-duty", icon: CalendarClock },
+  //     { label: "Weekend Setup", href: "/employees/weekend-setup", icon: PartyPopper },
+  //   ],
+  // },
 
-const roleNav: Record<Role, Item[]> = {
-  DEVELOPER: [{ label: "Dev Tools", href: "/dev/tools", icon: Wrench }],
-  SUPER_ADMIN: [
-    { label: "Super Dashboard", href: "/super-admin/overview", icon: Gauge },
-    { label: "Users", href: "/super-admin/users", icon: Users },
-  ],
-  ADMIN: [
-    { label: "Admin Panel", href: "/admin", icon: LayoutDashboard },
-    { label: "Settings", href: "/settings", icon: Settings },
-  ],
-};
+];
+
+/**
+ * Reconstruct navigation with icons from hardcoded data
+ */
+function reconstructWithIcons(filteredData: any[]): LocalNavNode[] {
+  return filteredData
+    .map((node) => {
+      if ("children" in node) {
+        // Find matching group in hardcoded nav
+        const hardcodedGroup = hardcodedNav.find(
+          (n) => isGroup(n) && n.label === node.label
+        ) as Group | undefined;
+        if (!hardcodedGroup) return null;
+
+        return {
+          label: node.label,
+          icon: hardcodedGroup.icon,
+          children: node.children.map((child: any) => {
+            const hardcodedChild = hardcodedGroup.children.find(
+              (c) => c.href === child.href
+            );
+            return {
+              label: child.label,
+              href: child.href,
+              icon: hardcodedChild?.icon || Home,
+            };
+          }),
+        };
+      }
+
+      // Find matching item in hardcoded nav
+      const hardcodedItem = hardcodedNav.find(
+        (n) => !isGroup(n) && n.href === node.href
+      ) as Item | undefined;
+      return {
+        label: node.label,
+        href: node.href,
+        icon: hardcodedItem?.icon || Home,
+      };
+    })
+    .filter((n): n is LocalNavNode => n !== null);
+}
 
 export default function Sidebar({
   collapsed,
@@ -59,10 +114,89 @@ export default function Sidebar({
   const { data: session } = useSession();
   const router = useRouter();
   const user = session?.user;
-  const role = (user?.role as Role | undefined) ?? undefined;
   const pathname = usePathname();
+  const [items, setItems] = useState<LocalNavNode[]>([]);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const navRef = useRef<HTMLElement>(null);
 
-  const items = [...commonNav, ...(role ? roleNav[role] ?? [] : [])];
+  // Fetch and filter routes based on permissions
+  useEffect(() => {
+    async function loadFilteredRoutes() {
+      try {
+        setIsLoading(true);
+        // Pass only the data (without icons) to server action
+        const hardcodedNavData = hardcodedNav.map((node) => {
+          if (isGroup(node)) {
+            return {
+              label: node.label,
+              children: node.children.map((child) => ({
+                label: child.label,
+                href: child.href,
+              })),
+            };
+          }
+          return {
+            label: node.label,
+            href: node.href,
+          };
+        });
+
+        const filtered = await getFilteredSidebarRoutes(hardcodedNavData);
+        console.log('Filtered routes:', filtered);
+
+        // Reconstruct with icons on client side
+        const reconstructed = reconstructWithIcons(filtered);
+        console.log('Reconstructed routes:', reconstructed);
+
+        // If no routes returned but user exists, use all routes (fallback for DEVELOPER)
+        if (reconstructed.length === 0 && user) {
+          console.log('No routes returned, using all hardcoded routes as fallback');
+          const allReconstructed = reconstructWithIcons(hardcodedNavData);
+          setItems(allReconstructed);
+        } else {
+          setItems(reconstructed);
+        }
+      } catch (error) {
+        console.error("Failed to load filtered routes:", error);
+        // Fallback to all routes on error
+        const hardcodedNavData = hardcodedNav.map((node) => {
+          if (isGroup(node)) {
+            return {
+              label: node.label,
+              children: node.children.map((child) => ({
+                label: child.label,
+                href: child.href,
+              })),
+            };
+          }
+          return {
+            label: node.label,
+            href: node.href,
+          };
+        });
+        const allReconstructed = reconstructWithIcons(hardcodedNavData);
+        setItems(allReconstructed);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    if (user) {
+      loadFilteredRoutes();
+    }
+  }, [user]);
+
+  // Update open groups based on pathname
+  useEffect(() => {
+    const next: Record<string, boolean> = {};
+    items.forEach((n) => {
+      if (isGroup(n)) {
+        next[n.label] = n.children.some((c) => pathname.startsWith(c.href));
+      }
+    });
+    setOpenGroups((prev) => ({ ...prev, ...next }));
+  }, [pathname, items]);
 
   // Persist collapsed state
   useEffect(() => {
@@ -97,97 +231,216 @@ export default function Sidebar({
     <TooltipProvider delayDuration={100}>
       <aside
         className={clsx(
-          "sticky top-0 h-dvh shrink-0 border-r border-border bg-primary/80 backdrop-blur flex flex-col",
+          "sticky top-0 h-dvh shrink-0 border-r border-border bg-primary/80 backdrop-blur",
           "transition-[width] duration-300 ease-in-out",
-          "w-(--sb-w)"
+          "flex flex-col"
         )}
         aria-label="Sidebar"
       >
-        {/* Header */}
-        <div className="flex h-14 shrink-0 items-center justify-between px-2 text-white">
+        {/* Header - Fixed */}
+        <div className="flex h-14 items-center justify-between px-2 flex-shrink-0">
           <div
             className={clsx(
               "flex items-center gap-2 overflow-hidden transition-opacity",
               collapsed ? "opacity-0 pointer-events-none" : "opacity-100"
             )}
           >
-            <span className="ml-2 font-semibold truncate">RareviewIt.com</span>
+            <div className="w-28 mx-auto">
+              <img src="/whiteLogo.png" alt="Logo" />
+            </div>
           </div>
-
-          <div className="flex items-center gap-1">
-            {!collapsed && <ModeToggle className="text-white hover:bg-white/20 h-8 w-8" />}
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              onClick={() => onToggle(!collapsed)}
-              className="h-8 w-8 text-white"
-            >
-              {collapsed ? <Menu className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() => onToggle(!collapsed)}
+            className="h-8 w-8 text-white"
+          >
+            {collapsed ? <Menu className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </Button>
         </div>
 
-        {/* User Info (Top) - Clickable to Profile */}
+        {/* User - Fixed */}
         {user && (
-          <div className="px-2 mb-2 shrink-0">
-            {maybeWrapWithTooltip(
-              <Link
-                href="/profile"
-                className={clsx(
-                  "flex items-center gap-2 rounded-lg bg-white/10 p-2 text-white hover:bg-white/20 transition overflow-hidden",
-                  collapsed ? "justify-center" : ""
-                )}
-              >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs text-primary font-bold uppercase overflow-hidden border border-white/20">
-                  {user.image ? (
-                    <img src={user.image} alt={user.name || "User"} className="h-full w-full object-cover" />
-                  ) : (
-                    initials(user.name, user.email)
-                  )}
-                </div>
-                {!collapsed && (
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{user.name ?? "User"}</p>
-                    <p className="truncate text-[10px] opacity-70">{user.email}</p>
-                  </div>
-                )}
-              </Link>,
-              "My Profile"
+          <Link
+            href="/profile"
+            className={clsx(
+              "flex items-center gap-2 p-2 flex-shrink-0 rounded-md hover:bg-white/10 transition-colors",
+              collapsed ? "justify-center" : ""
             )}
-          </div>
+          >
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs text-primary font-semibold">
+              {initials(user.name, user.email)}
+            </div>
+            {!collapsed && (
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-white">{user.name ?? user.email}</p>
+                <p className="truncate text-[11px] text-gray-200/80">{user.email}</p>
+              </div>
+            )}
+          </Link>
         )}
 
-        {/* Scrollable Nav Area */}
-        <div className="flex-1 overflow-y-auto px-2 py-2">
-          <nav className="flex flex-col gap-1">
-            {items.map((it) => {
-              const Icon = it.icon;
-              const isActive = pathname === it.href;
-              const link = (
-                <Link
-                  key={it.href}
-                  href={it.href}
-                  className={clsx(
-                    "group inline-flex items-center gap-3 rounded-md px-2 py-2 text-sm w-full font-medium transition-colors ",
-                    "hover:bg-white/20 text-white/90",
-                    isActive && "bg-white/20 border border-white/20",
-                    collapsed ? "justify-center" : "justify-start"
-                  )}
-                  aria-label={it.label}
-                >
-                  <Icon className="h-5 w-5 shrink-0" />
-                  {!collapsed && <span className="truncate">{it.label}</span>}
-                </Link>
-              );
+        {/* Nav - Scrollable */}
+        <nav
+          className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2 min-h-0"
+          ref={navRef}
+        >
+          <style>{`nav::-webkit-scrollbar {
+            width: 6px;
+          }
+          nav::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          nav::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+          }
+          nav::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+          }`}</style>
 
-              return <div key={it.href}>{maybeWrapWithTooltip(link, it.label)}</div>;
-            })}
-          </nav>
-        </div>
+          {isLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-8 bg-white/10 rounded animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {/* Home Button */}
+              <Link
+                href="/admin"
+                className={clsx(
+                  "group inline-flex items-center gap-3 rounded-md px-2 py-2 text-sm w-full font-medium transition-colors",
+                  "hover:bg-white/20 text-white/90",
+                  pathname === "/" && "bg-white/20 border border-white/20",
+                  collapsed ? "justify-center" : "justify-start"
+                )}
+                aria-label="Home"
+              >
+                <Home className="h-5 w-5 shrink-0" />
+                {!collapsed && <span className="truncate">Home</span>}
+              </Link>
 
-        {/* Footer (Fixed Bottom) */}
-        <div className="shrink-0 border-t border-white/10 p-2 flex flex-col gap-1 mt-auto">
+              {/* Navigation Items */}
+              {items.map((node) => {
+                if (!isGroup(node)) {
+                  const Icon = node.icon;
+                  const isActive = pathname === node.href;
+                  const link = (
+                    <Link
+                      key={node.href}
+                      href={node.href}
+                      className={clsx(
+                        "group inline-flex items-center gap-3 rounded-md px-2 py-2 text-sm w-full font-medium transition-colors",
+                        "hover:bg-white/20 text-white/90",
+                        isActive && "bg-white/20 border border-white/20",
+                        collapsed ? "justify-center" : "justify-start"
+                      )}
+                      aria-label={node.label}
+                    >
+                      <Icon className="h-5 w-5 shrink-0" />
+                      {!collapsed && <span className="truncate">{node.label}</span>}
+                    </Link>
+                  );
+                  return (
+                    <div key={`item-${node.href}-${node.label}`}>
+                      {maybeWrapWithTooltip(link, node.label)}
+                    </div>
+                  );
+                }
+
+                // Group rendering
+                const GIcon = node.icon;
+                const open = !!openGroups[node.label];
+                const toggle = () => {
+                  setOpenGroups((prev) => ({ ...prev, [node.label]: !prev[node.label] }));
+                  // Auto-scroll to show children when opening
+                  if (!open && !collapsed) {
+                    setTimeout(() => {
+                      const groupElement = document.getElementById(`group-${node.label}`);
+                      if (groupElement && navRef.current) {
+                        groupElement.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                      }
+                    }, 0);
+                  }
+                };
+
+                const groupIsActive = node.children.some((c) => pathname.startsWith(c.href));
+                const groupButton = (
+                  <button
+                    key={node.label}
+                    onClick={toggle}
+                    className={clsx(
+                      "group inline-flex items-center gap-3 rounded-md px-2 py-2 text-sm w-full font-medium transition-colors",
+                      "hover:bg-white/20 text-white/90 cursor-pointer",
+                      groupIsActive && "bg-white/20 border border-white/20",
+                      collapsed ? "justify-center" : "justify-between"
+                    )}
+                    aria-expanded={open}
+                    aria-controls={`group-${node.label}`}
+                  >
+                    <div className={clsx("flex items-center", collapsed ? "" : "gap-3")}>
+                      <GIcon className="h-5 w-5 shrink-0" />
+                      {!collapsed && <span className="truncate">{node.label}</span>}
+                    </div>
+                    {!collapsed && (open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />)}
+                  </button>
+                );
+
+                return (
+                  <div key={`group-${node.label}`} className="w-full">
+                    {maybeWrapWithTooltip(groupButton, node.label)}
+                    {/* Children */}
+                    {!collapsed && open && (
+                      <div id={`group-${node.label}`} className="mt-1 ml-6 flex flex-col gap-1">
+                        {node.children.map((child) => {
+                          const CIcon = child.icon;
+                          const isActive = pathname === child.href;
+                          return (
+                            <Link
+                              key={child.href}
+                              href={child.href}
+                              className={clsx(
+                                "inline-flex items-center gap-3 rounded-md px-2 py-2 text-sm w-full font-medium transition-colors",
+                                "hover:bg-white/20 text-white/90",
+                                isActive && "bg-white/20 border border-white/20"
+                              )}
+                              aria-label={`${node.label} → ${child.label}`}
+                            >
+                              <CIcon className="h-4 w-4 shrink-0" />
+                              <span className="truncate">{child.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </nav>
+
+        {/* Footer - Fixed */}
+        <div className="border-t border-border p-2 flex flex-col gap-2 flex-shrink-0">
+          {user &&
+            maybeWrapWithTooltip(
+              <button
+                onClick={handleSignOut}
+                className={clsx(
+                  "flex items-center gap-2 rounded-md px-2 py-2 text-sm text-white hover:bg-white/20 transition w-full",
+                  collapsed ? "justify-center" : "justify-start"
+                )}
+                aria-label="Sign out"
+              >
+                <LogOut className="h-4 w-4" />
+                {!collapsed && <span>Sign out</span>}
+              </button>,
+              "Sign out"
+            )}
+
           {maybeWrapWithTooltip(
             <Link
               href="/help"
@@ -197,25 +450,10 @@ export default function Sidebar({
               )}
               aria-label="Help / Docs"
             >
-              <HelpCircle className="h-4 w-4 shrink-0" />
+              <HelpCircle className="h-4 w-4" />
               {!collapsed && <span>Help / Docs</span>}
             </Link>,
             "Help"
-          )}
-
-          {maybeWrapWithTooltip(
-            <button
-              onClick={handleSignOut}
-              className={clsx(
-                "flex items-center gap-2 rounded-md px-2 py-2 text-sm text-white hover:bg-white/20 transition w-full",
-                collapsed ? "justify-center" : "justify-start"
-              )}
-              aria-label="Sign out"
-            >
-              <LogOut className="h-4 w-4 shrink-0" />
-              {!collapsed && <span>Sign out</span>}
-            </button>,
-            "Sign out"
           )}
         </div>
       </aside>

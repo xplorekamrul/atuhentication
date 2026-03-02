@@ -5,7 +5,7 @@ import { sendWelcomeEmail } from "@/lib/mail";
 import { prisma } from "@/lib/prisma";
 import { actionClient } from "@/lib/safe-action/clients";
 import { registerSchema } from "@/lib/validations/auth";
-import { Role } from "@prisma/client";
+import { userLevel } from "@prisma/client";
 
 export const register = actionClient
   .schema(registerSchema)
@@ -22,22 +22,24 @@ export const register = actionClient
       return { ok: false as const, message: "Username already taken" };
     }
 
-    let role: Role = Role.ADMIN;
+    let role: userLevel = userLevel.ADMIN;
     if (email === (process.env.SUPERADMIN_EMAIL ?? "").toLowerCase().trim()) {
-      role = Role.SUPER_ADMIN;
+      role = userLevel.SUPER_ADMIN;
     } else if (email === (process.env.DEVELOPER_EMAIL ?? "").toLowerCase().trim()) {
-      role = Role.DEVELOPER;
+      role = userLevel.DEVELOPER;
     }
 
     const pwd = await hashPassword(password);
 
     const user = await prisma.user.create({
-      data: { name, email, username, password: pwd, role },
-      select: { id: true, email: true, role: true, name: true, username: true },
+      data: { name, email, username, password: pwd, userlevel: role },
+      select: { id: true, email: true, userlevel: true, name: true, username: true },
     });
 
     // Send welcome email (fire and forget to not block response)
-    void sendWelcomeEmail(user.email, user.name ?? "User");
+    if (user.email) {
+      void sendWelcomeEmail(user.email, user.name ?? "User");
+    }
 
     return { ok: true as const, user };
   });

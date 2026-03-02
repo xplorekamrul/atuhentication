@@ -1,7 +1,7 @@
-import { Role } from "@prisma/client";
+import { userLevel } from "@prisma/client";
 import * as z from "zod";
 
-export const roleEnum = z.nativeEnum(Role);
+export const roleEnum = z.nativeEnum(userLevel);
 export const statusEnum = z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]);
 
 export const userListSchema = z.object({
@@ -23,13 +23,13 @@ export const createUserSchema = z.object({
 });
 
 export const updateUserInfoSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string().transform((val) => BigInt(val)),
   name: z.string().min(2).max(80),
   email: z.string().email().toLowerCase(),
 });
 
 export const updateUserPasswordSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string().transform((val) => BigInt(val)),
   password: z.string().min(6),
   confirm: z.string().min(6),
 }).refine((d) => d.password === d.confirm, {
@@ -38,10 +38,10 @@ export const updateUserPasswordSchema = z.object({
 });
 
 export const updateUserStatusSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string().transform((val) => BigInt(val)),
   status: statusEnum,
 });
 
 export const deleteUserSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string().transform((val) => BigInt(val)),
 });

@@ -68,16 +68,16 @@ export const authOptions: NextAuthOptions = {
         }
 
         const u: User = {
-          id: user.id,
+          id: user.id.toString(),
           name: user.name ?? null,
           email: user.email,
           image: user.image,
-          role: user.role as "ADMIN" | "SUPER_ADMIN" | "DEVELOPER",
+          userLvel: user.userlevel as "ADMIN" | "SUPER_ADMIN" | "DEVELOPER",
           status: user.status as "ACTIVE" | "INACTIVE" | "SUSPENDED",
         } as User;
 
         // Send login alert email (fire and forget)
-        if (user.name) {
+        if (user.name && user.email) {
           const { sendLoginAlertEmail } = await import("@/lib/mail");
           void sendLoginAlertEmail(user.email, user.name, new Date().toLocaleString());
         }
@@ -90,13 +90,13 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }: { token: JWT; user?: User }) {
       if (user) {
         token.id = user.id;
-        token.role = user.role as "ADMIN" | "SUPER_ADMIN" | "DEVELOPER";
+        token.userLvel = user.userLvel as "ADMIN" | "SUPER_ADMIN" | "DEVELOPER";
         token.status = user.status as "ACTIVE" | "INACTIVE" | "SUSPENDED";
         token.picture = user.image;
       } else if (token.email) {
         const dbUser = await prisma.user.findUnique({
           where: { email: token.email },
-          select: { id: true, role: true, status: true, name: true, image: true },
+          select: { id: true, userlevel: true, status: true, name: true, image: true },
         });
 
         if (!dbUser) {
@@ -105,8 +105,8 @@ export const authOptions: NextAuthOptions = {
         }
 
         if (dbUser) {
-          token.id = dbUser.id;
-          token.role = dbUser.role as "ADMIN" | "SUPER_ADMIN" | "DEVELOPER";
+          token.id = dbUser.id.toString();
+          token.userLvel = dbUser.userlevel as "ADMIN" | "SUPER_ADMIN" | "DEVELOPER";
           token.status = dbUser.status as "ACTIVE" | "INACTIVE" | "SUSPENDED";
           token.picture = dbUser.image;
         }
@@ -119,7 +119,7 @@ export const authOptions: NextAuthOptions = {
       // But simply checking token prevents the crash.
       if (token && session.user) {
         session.user.id = token.id as string;
-        session.user.role = token.role as "ADMIN" | "SUPER_ADMIN" | "DEVELOPER";
+        session.user.userLvel = token.userLvel as "ADMIN" | "SUPER_ADMIN" | "DEVELOPER";
         session.user.status = token.status as
           | "ACTIVE"
           | "INACTIVE"

@@ -1,7 +1,7 @@
 "use client";
 
 import { createUser } from "@/actions/users/create-user";
-import { Role } from "@prisma/client";
+import { userLevel } from "@prisma/client";
 import { Eye, EyeOff } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
 import { useMemo, useState } from "react";
@@ -16,7 +16,7 @@ export default function CreateUserDialog({ open, onOpenChange, onCreated }: Prop
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Role>(Role.ADMIN);
+  const [role, setRole] = useState<userLevel>(userLevel.ADMIN);
   const [pw, setPw] = useState("");
   const [show, setShow] = useState(false);
 
@@ -38,7 +38,7 @@ export default function CreateUserDialog({ open, onOpenChange, onCreated }: Prop
     if (res?.data?.ok) {
       onCreated();
       onOpenChange(false);
-      setName(""); setUsername(""); setEmail(""); setRole(Role.ADMIN); setPw("");
+      setName(""); setUsername(""); setEmail(""); setRole(userLevel.ADMIN); setPw("");
     }
   }
 
@@ -71,7 +71,7 @@ export default function CreateUserDialog({ open, onOpenChange, onCreated }: Prop
             <label className="text-sm">Role</label>
             <select
               className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2"
-              value={role} onChange={(e) => setRole(e.target.value as Role)}
+              value={role} onChange={(e) => setRole(e.target.value as userLevel)}
             >
               <option value="ADMIN">ADMIN</option>
               <option value="SUPER_ADMIN">SUPER_ADMIN</option>

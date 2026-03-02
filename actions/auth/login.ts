@@ -1,8 +1,8 @@
 "use server";
 
-import { actionClient } from "@/lib/safe-action/clients";
-import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/hash";
+import { prisma } from "@/lib/prisma";
+import { actionClient } from "@/lib/safe-action/clients";
 import { loginSchema } from "@/lib/validations/auth";
 
 export const login = actionClient
@@ -12,7 +12,7 @@ export const login = actionClient
 
     const user = await prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, password: true, role: true, name: true },
+      select: { id: true, email: true, password: true, userlevel: true, name: true },
     });
 
     if (!user) {
@@ -26,5 +26,5 @@ export const login = actionClient
     }
 
     // Auth session is still handled by NextAuth on the client (signIn).
-    return { ok: true as const, user: { id: user.id, email: user.email, role: user.role, name: user.name } };
+    return { ok: true as const, user: { id: user.id, email: user.email, role: user.userlevel, name: user.name } };
   });

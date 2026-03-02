@@ -15,14 +15,14 @@ export const listUsers = authActionClient
     if (q && q.trim().length) {
       and.push({
         OR: [
-          { name: { contains: q.trim(), mode: Prisma.QueryMode.insensitive } },
-          { email: { contains: q.trim(), mode: Prisma.QueryMode.insensitive } },
+          { name: { contains: q.trim() } },
+          { email: { contains: q.trim() } },
         ],
       });
     }
 
     if (roles && roles.length) {
-      and.push({ role: { in: roles as $Enums.Role[] } });
+      and.push({ userlevel: { in: roles as $Enums.userLevel[] } });
     }
 
     if (statuses && statuses.length) {
@@ -41,7 +41,7 @@ export const listUsers = authActionClient
           id: true,
           name: true,
           email: true,
-          role: true,
+          userlevel: true,
           status: true,
           suspendedAt: true,
           createdAt: true,
