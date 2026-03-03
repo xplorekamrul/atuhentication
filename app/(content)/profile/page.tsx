@@ -12,20 +12,43 @@ export default async function ProfilePage() {
       redirect("/login");
    }
 
-   const user = await prisma.user.findUnique({
-      where: { id: BigInt(session.user.id) },
-      select: {
-         name: true,
-         email: true,
-         username: true,
-         image: true,
-         profile: true,
-         loginHistory: {
-            take: 10,
-            orderBy: { createdAt: "desc" },
+   const userType = (session?.user as any)?.userType as string | undefined;
+   const userId = BigInt(session.user.id);
+
+   let user: any = null;
+
+   // Fetch from appropriate table based on user type
+   if (userType === "ADMIN") {
+      user = await prisma.admin.findUnique({
+         where: { id: userId },
+         select: {
+            name: true,
+            email: true,
+            username: true,
+            image: true,
+            profile: true,
+            loginHistory: {
+               take: 10,
+               orderBy: { createdAt: "desc" },
+            },
          },
-      },
-   });
+      });
+   } else {
+      user = await prisma.user.findUnique({
+         where: { id: userId },
+         select: {
+            name: true,
+            email: true,
+            username: true,
+            image: true,
+            profile: true,
+            loginHistory: {
+               take: 10,
+               orderBy: { createdAt: "desc" },
+            },
+         },
+      });
+   }
 
    if (!user) {
       redirect("/login");
@@ -48,7 +71,7 @@ export default async function ProfilePage() {
    };
 
    // Ensure non-null history
-   const loginHistoryData = (user.loginHistory ?? []).map((h) => ({
+   const loginHistoryData = (user.loginHistory ?? []).map((h: any) => ({
       id: h.id.toString(),
       ipAddress: h.ipAddress,
       userAgent: h.userAgent,
