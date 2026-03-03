@@ -24,6 +24,10 @@ export function serializeBigInt(obj: any): any {
       return obj.toString();
    }
 
+   if (obj instanceof Date) {
+      return obj.toISOString();
+   }
+
    if (Array.isArray(obj)) {
       return obj.map(item => serializeBigInt(item));
    }

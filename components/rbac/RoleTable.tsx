@@ -234,9 +234,9 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
                                              : role.createdAt instanceof Date
                                                 ? role.createdAt
                                                 : new Date(role.createdAt);
-                                          return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                                          return isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
                                        } catch {
-                                          return 'Invalid Date';
+                                          return '—';
                                        }
                                     })()}
                                  </td>

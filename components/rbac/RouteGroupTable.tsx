@@ -223,9 +223,9 @@ export default function RouteGroupTable({
                                              : group.createdAt instanceof Date
                                                 ? group.createdAt
                                                 : new Date(group.createdAt);
-                                          return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                                          return isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
                                        } catch {
-                                          return 'Invalid Date';
+                                          return '—';
                                        }
                                     })()}
                                  </td>

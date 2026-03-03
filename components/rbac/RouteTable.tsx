@@ -262,9 +262,9 @@ export default function RouteTable({
                                              : route.createdAt instanceof Date
                                                 ? route.createdAt
                                                 : new Date(route.createdAt);
-                                          return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                                          return isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
                                        } catch {
-                                          return 'Invalid Date';
+                                          return '—';
                                        }
                                     })()}
                                  </td>
