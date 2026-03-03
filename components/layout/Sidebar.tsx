@@ -48,17 +48,6 @@ function initials(name?: string | null, email?: string | null) {
 const hardcodedNav: LocalNavNode[] = [
   { label: "Users", href: "/admin/users", icon: Users },
   { label: "RBAC", href: "/admin/rbac", icon: ShieldAlert },
-
-  // {
-  //   label: "Employee MGT",
-  //   icon: Users,
-  //   children: [
-  //     { label: "Employee List", href: "/employees", icon: ListIcon },
-  //     { label: "Roster MGT", href: "/employees/roster-duty", icon: CalendarClock },
-  //     { label: "Weekend Setup", href: "/employees/weekend-setup", icon: PartyPopper },
-  //   ],
-  // },
-
 ];
 
 /**
@@ -143,42 +132,20 @@ export default function Sidebar({
         });
 
         const result = await getFilteredSidebarRoutes(hardcodedNavData);
-        console.log('Filtered routes result:', result);
+        console.log('[Sidebar] Filtered routes result:', result);
 
         setNoRoutesInDatabase(result.noRoutesInDatabase);
 
         // Reconstruct with icons on client side
         const reconstructed = reconstructWithIcons(result.routes);
-        console.log('Reconstructed routes:', reconstructed);
+        console.log('[Sidebar] Reconstructed routes:', reconstructed);
 
-        // If no routes returned but user exists, use all routes (fallback for DEVELOPER)
-        if (reconstructed.length === 0 && user && !result.noRoutesInDatabase) {
-          console.log('No routes returned, using all hardcoded routes as fallback');
-          const allReconstructed = reconstructWithIcons(hardcodedNavData);
-          setItems(allReconstructed);
-        } else {
-          setItems(reconstructed);
-        }
+        // Use exactly what the server returned - no fallback
+        setItems(reconstructed);
       } catch (error) {
-        console.error("Failed to load filtered routes:", error);
-        // Fallback to all routes on error
-        const hardcodedNavData = hardcodedNav.map((node) => {
-          if (isGroup(node)) {
-            return {
-              label: node.label,
-              children: node.children.map((child) => ({
-                label: child.label,
-                href: child.href,
-              })),
-            };
-          }
-          return {
-            label: node.label,
-            href: node.href,
-          };
-        });
-        const allReconstructed = reconstructWithIcons(hardcodedNavData);
-        setItems(allReconstructed);
+        console.error("[Sidebar] Failed to load filtered routes:", error);
+        // On error, show empty sidebar
+        setItems([]);
       } finally {
         setIsLoading(false);
       }
@@ -314,6 +281,12 @@ export default function Sidebar({
               <p className="text-sm text-white/60">No routes available in database</p>
               <p className="text-xs text-white/40 mt-1">Contact administrator to configure routes</p>
             </div>
+          ) : items.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+              <ShieldAlert className="h-8 w-8 text-white/40 mb-3" />
+              <p className="text-sm text-white/60">No access to any routes</p>
+              <p className="text-xs text-white/40 mt-1">Contact administrator to assign permissions</p>
+            </div>
           ) : (
             <div className="flex flex-col gap-1">
               {/* Home Button */}
@@ -322,7 +295,7 @@ export default function Sidebar({
                 className={clsx(
                   "group inline-flex items-center gap-3 rounded-md px-2 py-2 text-sm w-full font-medium transition-colors",
                   "hover:bg-white/20 text-white/90",
-                  pathname === "/" && "bg-white/20 border border-white/20",
+                  pathname === "/admin" && "bg-white/20 border border-white/20",
                   collapsed ? "justify-center" : "justify-start"
                 )}
                 aria-label="Home"
@@ -451,7 +424,7 @@ export default function Sidebar({
 
           {maybeWrapWithTooltip(
             <Link
-              href="/help"
+              href="/admin/help"
               className={clsx(
                 "flex items-center gap-2 rounded-md px-2 py-2 text-sm text-white hover:bg-white/20 transition",
                 collapsed ? "justify-center" : "justify-start"

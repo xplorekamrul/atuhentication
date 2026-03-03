@@ -4,8 +4,8 @@ import { redirect } from "next/navigation";
 type Role = "DEVELOPER" | "SUPER_ADMIN" | "ADMIN" | "USER";
 
 const ROLE_HOME: Record<Role, string> = {
-   SUPER_ADMIN: "/super-admin",
-   DEVELOPER: "/developer",
+   SUPER_ADMIN: "/admin",
+   DEVELOPER: "/admin",
    ADMIN: "/admin",
    USER: "/",
 };

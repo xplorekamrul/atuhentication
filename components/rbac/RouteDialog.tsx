@@ -1,5 +1,6 @@
 "use client";
 
+import { listRouteGroups } from "@/actions/rbac/route-groups";
 import { createRoute, updateRoute } from "@/actions/rbac/routes";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -56,7 +57,7 @@ export default function RouteDialog({
    open,
    onOpenChange,
    route,
-   routeGroups,
+   routeGroups: initialRouteGroups,
    onClose,
 }: RouteDialogProps) {
    const [path, setPath] = useState("");
@@ -67,11 +68,30 @@ export default function RouteDialog({
    const [editableByAdmin, setEditableByAdmin] = useState(false);
    const [editableBySuperAdmin, setEditableBySuperAdmin] = useState(true);
    const [error, setError] = useState("");
+   const [routeGroups, setRouteGroups] = useState<RouteGroup[]>(initialRouteGroups);
+   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
 
    const { executeAsync: doCreate, isPending: isCreating } = useAction(createRoute);
    const { executeAsync: doUpdate, isPending: isUpdating } = useAction(updateRoute);
+   const { executeAsync: doListGroups } = useAction(listRouteGroups);
 
    const isPending = isCreating || isUpdating;
+
+   // Fetch fresh route groups when dialog opens
+   useEffect(() => {
+      if (open) {
+         setIsLoadingGroups(true);
+         doListGroups({ page: 1, pageSize: 100 }).then((result) => {
+            if (result?.data?.ok) {
+               setRouteGroups(result.data.items.map((item: any) => ({
+                  id: item.id,
+                  name: item.name,
+               })));
+            }
+            setIsLoadingGroups(false);
+         });
+      }
+   }, [open, doListGroups]);
 
    useEffect(() => {
       if (open) {

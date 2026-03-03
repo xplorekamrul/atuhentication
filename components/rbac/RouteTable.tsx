@@ -255,7 +255,7 @@ export default function RouteTable({
                                     </div>
                                  </td>
                                  <td className="px-4 py-3 text-muted-foreground text-xs">
-                                    {new Date(route.createdAt).toLocaleDateString()}
+                                    {new Date(route.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                                  </td>
                                  <td className="px-4 py-3 text-right">
                                     <div className="flex items-center justify-end gap-2">

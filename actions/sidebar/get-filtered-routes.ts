@@ -23,22 +23,26 @@ export type FilteredRoutesResult = {
 
 /**
  * Get all accessible routes from database based on user level and roles
- * This is cached and revalidated on demand
+ * 
+ * Returns routes that are VISIBLE to the user's level.
+ * Visibility controls sidebar display.
+ * Editability controls what actions can be performed (checked in proxy/permissions).
  */
 export async function getAccessibleRoutePaths(adminId: bigint, level: string): Promise<string[]> {
-   'use cache';
-
    // DEVELOPER has full access
    if (level === 'DEVELOPER') {
       return []; // Empty array means full access
    }
 
-   // SUPER_ADMIN: get all visible routes
+   // SUPER_ADMIN: get all routes visible to super admin
    if (level === 'SUPER_ADMIN') {
       const routes = await prisma.route.findMany({
-         where: { visibleToSuperAdmin: true },
+         where: {
+            visibleToSuperAdmin: true,
+         },
          select: { path: true },
       });
+      console.log('[getAccessibleRoutePaths] SUPER_ADMIN routes:', routes.map(r => r.path));
       return routes.map((r) => r.path);
    }
 
@@ -54,10 +58,13 @@ export async function getAccessibleRoutePaths(adminId: bigint, level: string): P
       });
 
       if (!admin || admin.adminRoles.length === 0) {
+         console.log('[getAccessibleRoutePaths] ADMIN has no roles');
          return [];
       }
 
       const roleIds = admin.adminRoles.map((ar) => ar.roleId);
+      console.log('[getAccessibleRoutePaths] ADMIN roleIds:', roleIds);
+
       const routes = await prisma.route.findMany({
          where: {
             visibleToAdmin: true,
@@ -72,6 +79,7 @@ export async function getAccessibleRoutePaths(adminId: bigint, level: string): P
          select: { path: true },
       });
 
+      console.log('[getAccessibleRoutePaths] ADMIN routes:', routes.map(r => r.path));
       return routes.map((r) => r.path);
    }
 
@@ -81,6 +89,12 @@ export async function getAccessibleRoutePaths(adminId: bigint, level: string): P
 /**
  * Get filtered sidebar navigation paths based on user level and database permissions
  * Returns only serializable data (no React components)
+ * 
+ * Logic:
+ * - DEVELOPER: Show all hardcoded nav items (no filtering)
+ * - SUPER_ADMIN: Show only nav items where path exists in database with visibleToSuperAdmin: true
+ * - ADMIN: Show only nav items where path exists in database with visibleToAdmin: true AND user has role permission
+ *          If ADMIN has no roles, show NO nav items (empty sidebar)
  */
 export async function getFilteredSidebarRoutes(
    hardcodedRoutes: NavNodeData[]
@@ -108,17 +122,11 @@ export async function getFilteredSidebarRoutes(
          return { routes: [], noRoutesInDatabase: false };
       }
 
-      // DEVELOPER has full access - no need to check permissions
+      // DEVELOPER has full access - show all hardcoded nav items
       if (level === 'DEVELOPER') {
          console.log('[getFilteredSidebarRoutes] DEVELOPER user - returning all routes');
          return { routes: hardcodedRoutes, noRoutesInDatabase: false };
       }
-
-      // Get accessible routes for ADMIN and SUPER_ADMIN
-      const adminId = BigInt(session.user.id);
-      const accessibleRoutes = await getAccessibleRoutePaths(adminId, level);
-
-      console.log('[getFilteredSidebarRoutes] Accessible routes:', accessibleRoutes);
 
       // Check if there are any routes in the database at all
       const totalRoutesInDb = await prisma.route.count();
@@ -130,7 +138,26 @@ export async function getFilteredSidebarRoutes(
          return { routes: [], noRoutesInDatabase: true };
       }
 
-      // Filter routes recursively
+      // For ADMIN: check if user has any roles assigned
+      if (level === 'ADMIN') {
+         const admin = await prisma.admin.findUnique({
+            where: { id: BigInt(session.user.id) },
+            select: { adminRoles: { select: { roleId: true } } },
+         });
+
+         if (!admin || admin.adminRoles.length === 0) {
+            console.log('[getFilteredSidebarRoutes] ADMIN has no roles assigned - showing empty sidebar');
+            return { routes: [], noRoutesInDatabase: false };
+         }
+      }
+
+      // Get accessible routes for SUPER_ADMIN and ADMIN
+      const adminId = BigInt(session.user.id);
+      const accessibleRoutes = await getAccessibleRoutePaths(adminId, level);
+
+      console.log('[getFilteredSidebarRoutes] Accessible routes:', accessibleRoutes);
+
+      // Filter hardcoded nav items against accessible routes from database
       const filtered = filterNavNodes(hardcodedRoutes, accessibleRoutes);
       return { routes: filtered, noRoutesInDatabase: false };
    } catch (error) {
@@ -140,8 +167,10 @@ export async function getFilteredSidebarRoutes(
    }
 }
 
+
 /**
  * Recursively filter navigation nodes based on accessible routes
+ * Only includes nav items where the path matches an accessible route from the database
  */
 function filterNavNodes(
    nodes: NavNodeData[],

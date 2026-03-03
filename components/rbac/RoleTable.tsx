@@ -227,7 +227,7 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
                                     </span>
                                  </td>
                                  <td className="px-4 py-3 text-muted-foreground text-xs">
-                                    {new Date(role.createdAt).toLocaleDateString()}
+                                    {new Date(role.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                                  </td>
                                  <td className="px-4 py-3 text-right">
                                     <div className="flex items-center justify-end gap-2">
