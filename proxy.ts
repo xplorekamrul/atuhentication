@@ -36,7 +36,7 @@ export async function proxy(req: NextRequest) {
     const level = (session?.user as any)?.level as string | undefined;
     const userId = session?.user?.id ? BigInt(session.user.id) : null;
 
-    console.log('[proxy] Session user:', session?.user?.email, 'userType:', userType, 'level:', level);
+    // console.log('[proxy] Session user:', session?.user?.email, 'userType:', userType, 'level:', level);
 
     const requireLogin = (redirectTo = "/login") => {
       url.pathname = redirectTo;
@@ -108,14 +108,14 @@ export async function proxy(req: NextRequest) {
 
       // DEVELOPER has full access
       if (level === LEVEL_DEV) {
-        console.log('[proxy] DEVELOPER - full access');
+        // console.log('[proxy] DEVELOPER - full access');
         return NextResponse.next();
       }
 
       // SUPER_ADMIN and ADMIN: check permissions
       if ((level === LEVEL_SUPER || level === LEVEL_ADMIN) && userId) {
         const hasAccess = await canAdminAccessPath(userId, pathname);
-        console.log('[proxy] Admin access check:', hasAccess);
+        // console.log('[proxy] Admin access check:', hasAccess);
         if (!hasAccess) {
           return redirectToAdminHome();
         }

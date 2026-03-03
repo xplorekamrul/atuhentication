@@ -14,7 +14,7 @@ if (!globalForPrisma.prisma) {
         port: Number(process.env.MARIADB_PORT) || 3306,
         user: process.env.MARIADB_USER || 'root',
         password: process.env.MARIADB_PASSWORD || '',
-        database: process.env.MARIADB_DATABASE || 'obokash',
+        database: process.env.MARIADB_DATABASE || 'auth',
     });
 
     globalForPrisma.prisma = new PrismaClient({ adapter });
