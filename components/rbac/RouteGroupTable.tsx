@@ -126,7 +126,7 @@ export default function RouteGroupTable({
    return (
       <>
          <Card className="space-y-2 bg-card border-border">
-            <CardHeader className="space-y-2">
+            <CardHeader className="space-y-2 p-0">
                <CardTitle className="text-lg font-semibold text-tcolor">
                   Route Groups
                </CardTitle>
@@ -165,7 +165,7 @@ export default function RouteGroupTable({
                </div>
             </CardHeader>
 
-            <CardContent className="pb-0">
+            <CardContent className="pb-2">
                <div className="overflow-x-auto rounded-lg border border-border bg-card">
                   <table className="min-w-full text-sm">
                      <thead className="bg-muted">
@@ -216,7 +216,18 @@ export default function RouteGroupTable({
                                     </span>
                                  </td>
                                  <td className="px-4 py-3 text-muted-foreground text-xs">
-                                    {new Date(group.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                    {(() => {
+                                       try {
+                                          const date = typeof group.createdAt === 'string'
+                                             ? new Date(group.createdAt)
+                                             : group.createdAt instanceof Date
+                                                ? group.createdAt
+                                                : new Date(group.createdAt);
+                                          return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                                       } catch {
+                                          return 'Invalid Date';
+                                       }
+                                    })()}
                                  </td>
                                  <td className="px-4 py-3 text-right">
                                     <div className="flex items-center justify-end gap-2">

@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useAction } from "next-safe-action/hooks";
 import { resetPassword } from "@/actions/auth/forgot/reset-password";
 import { Eye, EyeOff } from "lucide-react";
+import { useAction } from "next-safe-action/hooks";
+import { useMemo, useState } from "react";
 
 export default function ForgotResetForm() {
   const { executeAsync, status, result } = useAction(resetPassword);
@@ -167,7 +167,7 @@ export default function ForgotResetForm() {
       <button
         type="submit"
         disabled={status === "executing"}
-        className="w-full rounded-lg bg-pcolor text-white py-2.5 hover:bg-scolor transition-colors disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sidebar-ring"
+        className="w-full rounded-lg bg-primary text-white py-2.5 hover:bg-scolor transition-colors disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sidebar-ring"
       >
         {status === "executing" ? "Updating…" : "Update password"}
       </button>

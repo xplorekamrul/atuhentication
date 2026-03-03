@@ -95,10 +95,10 @@ export default function CreateUserDialog({ open, onOpenChange, onCreated }: Prop
         ) : null}
 
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={() => onOpenChange(false)} className="px-3 py-2 rounded-md border">
+          <button type="button" onClick={() => onOpenChange(false)} className="px-3 py-2 rounded-md border cursor-pointer">
             Cancel
           </button>
-          <button disabled={status === "executing"} className="px-3 py-2 rounded-md bg-pcolor text-white">
+          <button disabled={status === "executing"} className="px-3 py-2 rounded-md bg-primary text-white cursor-pointer">
             Save
           </button>
         </div>

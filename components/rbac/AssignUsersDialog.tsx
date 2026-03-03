@@ -16,13 +16,12 @@ import { useAction } from "next-safe-action/hooks";
 import { useEffect, useState, useTransition } from "react";
 
 type User = {
-  id: string | bigint;
+  id: string;
   name: string | null;
   email: string | null;
-  username?: string | null;
-  level: string;
+  role: string | null;
+  userType: "ADMIN" | "USER";
   status: string;
-  suspendedAt?: Date | null;
   createdAt: string | Date;
 };
 
@@ -67,9 +66,9 @@ export default function AssignUsersDialog({
       }
 
       if (availableResult?.data?.ok) {
-        // Filter out DEVELOPER admins
+        // Filter out DEVELOPER admins and regular users (only show ADMIN and SUPER_ADMIN)
         const filtered = availableResult.data.items.filter(
-          (user) => user.level !== "DEVELOPER"
+          (user) => user.role !== "DEVELOPER" && user.userType === "ADMIN"
         );
         setAvailableUsers(filtered);
       }
@@ -149,8 +148,7 @@ export default function AssignUsersDialog({
     );
     const matchesSearch =
       u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.username?.toLowerCase().includes(searchQuery.toLowerCase());
+      u.email?.toLowerCase().includes(searchQuery.toLowerCase());
     return !isAssigned && matchesSearch;
   });
 

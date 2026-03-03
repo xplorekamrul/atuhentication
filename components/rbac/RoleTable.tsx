@@ -176,7 +176,7 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
                </div>
             </CardHeader>
 
-            <CardContent className="pb-0">
+            <CardContent className="pb-2">
                <div className="overflow-x-auto rounded-lg border border-border bg-card">
                   <table className="min-w-full text-sm">
                      <thead className="bg-muted">
@@ -227,7 +227,18 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
                                     </span>
                                  </td>
                                  <td className="px-4 py-3 text-muted-foreground text-xs">
-                                    {new Date(role.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                    {(() => {
+                                       try {
+                                          const date = typeof role.createdAt === 'string'
+                                             ? new Date(role.createdAt)
+                                             : role.createdAt instanceof Date
+                                                ? role.createdAt
+                                                : new Date(role.createdAt);
+                                          return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                                       } catch {
+                                          return 'Invalid Date';
+                                       }
+                                    })()}
                                  </td>
                                  <td className="px-4 py-3 text-right">
                                     <div className="flex items-center justify-end gap-2">

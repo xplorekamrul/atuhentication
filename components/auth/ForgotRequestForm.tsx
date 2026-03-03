@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useAction } from "next-safe-action/hooks";
 import { sendResetOtp } from "@/actions/auth/forgot/send-otp";
+import { useAction } from "next-safe-action/hooks";
+import { useMemo, useState } from "react";
 
 export default function ForgotRequestForm() {
   const { executeAsync, status, result } = useAction(sendResetOtp);
@@ -48,7 +48,7 @@ export default function ForgotRequestForm() {
       <button
         type="submit"
         disabled={status === "executing"}
-        className="w-full rounded-lg bg-pcolor text-white py-2.5 hover:bg-scolor transition-colors disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sidebar-ring"
+        className="w-full rounded-lg bg-primary text-white py-2.5 hover:bg-scolor transition-colors disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sidebar-ring"
       >
         {status === "executing" ? "Sending…" : "Send code"}
       </button>

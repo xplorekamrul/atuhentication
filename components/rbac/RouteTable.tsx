@@ -255,7 +255,18 @@ export default function RouteTable({
                                     </div>
                                  </td>
                                  <td className="px-4 py-3 text-muted-foreground text-xs">
-                                    {new Date(route.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                    {(() => {
+                                       try {
+                                          const date = typeof route.createdAt === 'string'
+                                             ? new Date(route.createdAt)
+                                             : route.createdAt instanceof Date
+                                                ? route.createdAt
+                                                : new Date(route.createdAt);
+                                          return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                                       } catch {
+                                          return 'Invalid Date';
+                                       }
+                                    })()}
                                  </td>
                                  <td className="px-4 py-3 text-right">
                                     <div className="flex items-center justify-end gap-2">
