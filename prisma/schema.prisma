@@ -39,6 +39,7 @@ model Admin {
   password      String         @db.VarChar(255)
   image         String?
   status        AccountStatus  @default(ACTIVE)
+  sessionVersion Int           @default(1) @map("session_version")
   suspendedAt   DateTime?      @map("suspended_at")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
@@ -133,6 +134,7 @@ model User {
   password      String         @db.VarChar(255)
   image         String?
   status        AccountStatus  @default(ACTIVE)
+  sessionVersion Int           @default(1) @map("session_version")
   suspendedAt   DateTime?      @map("suspended_at")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")

@@ -83,29 +83,29 @@ export const adminAuthOptions: NextAuthOptions = {
    callbacks: {
       async jwt({ token, user }: { token: JWT; user?: User }) {
          if (user) {
+            const dbAdmin = await prisma.admin.findUnique({
+               where: { id: BigInt(user.id) },
+               select: { sessionVersion: true },
+            });
             token.id = user.id;
             token.userType = user.userType;
             token.level = user.level;
             token.status = user.status;
             token.picture = user.image;
-         } else if (token.email) {
+            token.sessionVersion = dbAdmin?.sessionVersion ?? 1;
+         } else if (token.id) {
             // Try to find admin
-            const admin = await prisma.admin.findUnique({
-               where: { email: token.email },
-               select: { id: true, level: true, status: true, name: true, image: true },
+            const dbAdmin = await prisma.admin.findUnique({
+               where: { id: BigInt(token.id as string) },
+               select: { id: true, level: true, status: true, name: true, image: true, sessionVersion: true },
             });
 
-            if (!admin) {
-               // Admin has been deleted from the database
-               // Return token as-is, don't return null
-               return token;
+            if (!dbAdmin || dbAdmin.status === "INACTIVE" || dbAdmin.status === "SUSPENDED" || dbAdmin.sessionVersion !== token.sessionVersion) {
+               return null as any; // Invalidates session
             }
 
-            token.id = admin.id.toString();
-            token.userType = "ADMIN";
-            token.level = admin.level;
-            token.status = admin.status;
-            token.picture = admin.image;
+            token.status = dbAdmin.status;
+            token.picture = dbAdmin.image;
          }
          return token;
       },

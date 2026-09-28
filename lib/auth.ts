@@ -83,25 +83,27 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }: { token: JWT; user?: User }) {
       if (user) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: BigInt(user.id) },
+          select: { sessionVersion: true },
+        });
         token.id = user.id;
         token.userType = user.userType;
         token.status = user.status;
         token.picture = user.image;
-      } else if (token.email) {
+        token.sessionVersion = dbUser?.sessionVersion ?? 1;
+      } else if (token.id) {
         // Try to find user
         const dbUser = await prisma.user.findUnique({
-          where: { email: token.email },
-          select: { id: true, status: true, name: true, image: true },
+          where: { id: BigInt(token.id as string) },
+          select: { id: true, status: true, name: true, image: true, sessionVersion: true },
         });
 
-        if (!dbUser) {
-          // User has been deleted from the database
-          // Return token as-is, don't return null
-          return token;
+        if (!dbUser || dbUser.status === "INACTIVE" || dbUser.status === "SUSPENDED" || dbUser.sessionVersion !== token.sessionVersion) {
+          // Invalidates session
+          return null as any;
         }
 
-        token.id = dbUser.id.toString();
-        token.userType = "USER";
         token.status = dbUser.status;
         token.picture = dbUser.image;
       }

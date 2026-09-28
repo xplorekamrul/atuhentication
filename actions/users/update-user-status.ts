@@ -4,49 +4,81 @@ import { prisma } from "@/lib/prisma";
 import { superAdminActionClient } from "@/lib/safe-action/clients";
 import { updateUserStatusSchema } from "@/lib/validations/users";
 import { $Enums, Prisma } from "@prisma/client";
+import { sendStatusUpdateEmail } from "@/lib/mail";
 
 export const updateUserStatus = superAdminActionClient
   .schema(updateUserStatusSchema)
   .action(async ({ parsedInput, ctx }) => {
     const { id, status } = parsedInput;
 
-    //Fetch target first
-    const target = await prisma.admin.findUnique({
+    let targetAdmin = await prisma.admin.findUnique({
       where: { id },
       select: { id: true, level: true, email: true, name: true },
     });
 
-    if (!target) {
-      return { ok: false as const, message: "Admin not found." };
+    let targetUser = null;
+    if (!targetAdmin) {
+      targetUser = await prisma.user.findUnique({
+        where: { id },
+        select: { id: true, email: true, name: true },
+      });
     }
 
-    //   do not allow modifying Developer admins
-    if (target.level === $Enums.AdminLevel.DEVELOPER) {
+    if (!targetAdmin && !targetUser) {
+      return { ok: false as const, message: "User/Admin not found." };
+    }
+
+    // do not allow modifying Developer admins
+    if (targetAdmin?.level === $Enums.AdminLevel.DEVELOPER) {
       return {
         ok: false as const,
         message: "Developer admins are protected and cannot be modified.",
       };
     }
 
+    const isSuspendedOrInactive = status === "SUSPENDED" || status === "INACTIVE";
 
+    if (targetAdmin) {
+      const data: Prisma.AdminUpdateInput = {
+        status: status as $Enums.AccountStatus,
+        suspendedAt: status === "SUSPENDED" ? new Date() : null,
+      };
+      
+      if (isSuspendedOrInactive) {
+        data.sessionVersion = { increment: 1 };
+      }
 
-    const data: Prisma.AdminUpdateInput =
-      status === "SUSPENDED"
-        ? { status: status as $Enums.AccountStatus, suspendedAt: new Date() }
-        : { status: status as $Enums.AccountStatus, suspendedAt: null };
+      const admin = await prisma.admin.update({
+        where: { id },
+        data,
+        select: { id: true, name: true, email: true, level: true, status: true, suspendedAt: true },
+      });
+      
+      if (admin.email && admin.name) {
+         sendStatusUpdateEmail(admin.email, admin.name, status).catch(console.error);
+      }
+      return { ok: true as const, user: admin };
+    } else if (targetUser) {
+      const data: Prisma.UserUpdateInput = {
+        status: status as $Enums.AccountStatus,
+        suspendedAt: status === "SUSPENDED" ? new Date() : null,
+      };
+      
+      if (isSuspendedOrInactive) {
+        data.sessionVersion = { increment: 1 };
+      }
 
-    const admin = await prisma.admin.update({
-      where: { id },
-      data,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        level: true,
-        status: true,
-        suspendedAt: true,
-      },
-    });
+      const user = await prisma.user.update({
+        where: { id },
+        data,
+        select: { id: true, name: true, email: true, status: true, suspendedAt: true },
+      });
+      
+      if (user.email && user.name) {
+         sendStatusUpdateEmail(user.email, user.name, status).catch(console.error);
+      }
+      return { ok: true as const, user };
+    }
 
-    return { ok: true as const, user: admin };
+    return { ok: false as const, message: "Failed to update." };
   });
