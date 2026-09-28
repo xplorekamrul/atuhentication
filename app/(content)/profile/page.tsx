@@ -12,20 +12,43 @@ export default async function ProfilePage() {
       redirect("/login");
    }
 
-   const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: {
-         name: true,
-         email: true,
-         username: true,
-         image: true,
-         userInfo: true,
-         loginHistory: {
-            take: 10,
-            orderBy: { createdAt: "desc" },
+   const userType = (session?.user as any)?.userType as string | undefined;
+   const userId = BigInt(session.user.id);
+
+   let user: any = null;
+
+   // Fetch from appropriate table based on user type
+   if (userType === "ADMIN") {
+      user = await prisma.admin.findUnique({
+         where: { id: userId },
+         select: {
+            name: true,
+            email: true,
+            username: true,
+            image: true,
+            profile: true,
+            loginHistory: {
+               take: 10,
+               orderBy: { createdAt: "desc" },
+            },
          },
-      },
-   });
+      });
+   } else {
+      user = await prisma.user.findUnique({
+         where: { id: userId },
+         select: {
+            name: true,
+            email: true,
+            username: true,
+            image: true,
+            profile: true,
+            loginHistory: {
+               take: 10,
+               orderBy: { createdAt: "desc" },
+            },
+         },
+      });
+   }
 
    if (!user) {
       redirect("/login");
@@ -33,23 +56,23 @@ export default async function ProfilePage() {
 
    const userData = {
       name: user.name ?? "",
-      email: user.email,
+      email: user.email ?? "",
       username: user.username ?? "",
       image: user.image,
    };
 
    const userInfoData = {
-      dateOfBirth: user.userInfo?.dateOfBirth?.toISOString() ?? null,
-      phone: user.userInfo?.phone ?? null,
-      gender: user.userInfo?.gender ?? null,
-      address: user.userInfo?.address ?? null,
-      profession: user.userInfo?.profession ?? null,
-      hobbys: user.userInfo?.hobbys ?? null,
+      dateOfBirth: user.profile?.dateOfBirth?.toISOString() ?? null,
+      phone: user.profile?.phone ?? null,
+      gender: user.profile?.gender ?? null,
+      address: user.profile?.address ?? null,
+      profession: user.profile?.profession ?? null,
+      hobbys: user.profile?.hobbys ?? null,
    };
 
    // Ensure non-null history
-   const loginHistoryData = (user.loginHistory ?? []).map((h) => ({
-      id: h.id,
+   const loginHistoryData = (user.loginHistory ?? []).map((h: any) => ({
+      id: h.id.toString(),
       ipAddress: h.ipAddress,
       userAgent: h.userAgent,
       location: h.location,

@@ -1,8 +1,8 @@
 import UserTable from "@/components/users/UserTable";
-import { auth } from "@/lib/auth";
+import { adminAuth } from "@/lib/admin-auth";
 
 export default async function AdminUsersPage() {
-  const session = await auth();
+  const session = await adminAuth();
   if (!session?.user) {
     return <div className="p-6">Unauthorized</div>;
   }

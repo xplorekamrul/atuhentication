@@ -1,0 +1,6 @@
+{
+   "description": "Pages that only DEVELOPER level admins can access. Any other user trying to access these pages will be redirected to home.",
+   "developerOnlyPages": [
+      "/admin/rbac"
+   ]
+}

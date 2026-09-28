@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { updateUserPassword } from "@/actions/users/update-user-password";
 import { Eye, EyeOff } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
-import { updateUserPassword } from "@/actions/users/update-user-password";
+import { useMemo, useState } from "react";
 
 type Props = {
   open: boolean;
@@ -36,7 +36,7 @@ export default function EditPasswordDialog({ open, onOpenChange, userId, onSaved
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-30 grid place-items-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-30 grid place-items-center bg-black/40 p-4 text-left">
       <form onSubmit={submit} className="w-full max-w-md rounded-xl border border-border bg-background p-4 shadow-xl">
         <h3 className="text-lg font-semibold mb-3">Edit Password</h3>
 
@@ -73,10 +73,10 @@ export default function EditPasswordDialog({ open, onOpenChange, userId, onSaved
         </div>
 
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={() => onOpenChange(false)} className="px-3 py-2 rounded-md border">
+          <button type="button" onClick={() => onOpenChange(false)} className="px-3 py-2 rounded-md border cursor-pointer">
             Cancel
           </button>
-          <button disabled={status === "executing"} className="px-3 py-2 rounded-md bg-pcolor text-white">
+          <button disabled={status === "executing"} className="px-3 py-2 rounded-md bg-primary text-white cursor-pointer">
             Save
           </button>
         </div>

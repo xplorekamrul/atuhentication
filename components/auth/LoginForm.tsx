@@ -2,17 +2,26 @@
 
 import type { LoginValues } from "@/lib/validations/auth";
 import { Eye, EyeOff } from "lucide-react";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Button } from "../ui/button";
 
 export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?: string }) {
   const router = useRouter();
+  const { data: session } = useSession();
   const [form, setForm] = useState<LoginValues>({ email: "", password: "" });
   const [showPw, setShowPw] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (session?.user) {
+      router.push(callbackUrl);
+    }
+  }, [session, router, callbackUrl]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,8 +29,6 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
     setLoading(true);
 
     try {
-      // 1) Create session via NextAuth
-      // We use redirect: false to handle errors in UI, but success leads to manual redirect
       const res = await signIn("credentials", {
         redirect: false,
         email: form.email,
@@ -35,10 +42,14 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
         return;
       }
 
-      // 2) Client-side redirect to the Dispatcher / Dashboard
-      // The dispatcher will handle role-based routing server-side
-      router.push(callbackUrl);
-      router.refresh();
+      if (res?.ok) {
+        // Wait for session to be updated
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Redirect to home page for users
+        const redirectUrl = callbackUrl === "/dashboard" ? "/" : callbackUrl;
+        router.push(redirectUrl);
+      }
     } catch (err) {
       setFormError("Something went wrong.");
       setLoading(false);
@@ -75,7 +86,7 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
           <div>
             <Link
               href="/forgot"
-              className="text-sm text-linkcolor hover:text-hcolor underline decoration-dotted"
+              className="text-sm text-linkcolor hover:text-textcolor underline decoration-dotted"
             >
               Forgot password?
             </Link>
@@ -102,7 +113,7 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
             onClick={() => setShowPw((v) => !v)}
             className="
               absolute inset-y-0 right-2 my-auto inline-flex h-8 w-8 items-center justify-center
-              rounded-md text-muted-foreground hover:text-hcolor
+              rounded-md text-muted-foreground hover:text-textcolor
               focus:outline-none focus:ring-2 focus:ring-sidebar-ring
             "
             aria-label={showPw ? "Hide password" : "Show password"}
@@ -115,13 +126,13 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
 
       {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
 
-      <button
+      <Button
         type="submit"
         disabled={loading}
         className="
           w-full inline-flex items-center justify-center gap-2
-          rounded-lg bg-pcolor text-white py-2.5
-          hover:bg-scolor transition-colors
+          rounded-lg bg-primary text-white py-2.5!
+          hover:bg-primary/80 transition-colors
           disabled:opacity-60
           focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sidebar-ring
         "
@@ -137,11 +148,11 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
         ) : (
           "Sign in"
         )}
-      </button>
+      </Button>
 
       <p className="text-sm text-center text-muted-foreground">
         No account?{" "}
-        <a href="/register" className="underline decoration-dotted text-linkcolor hover:text-hcolor">
+        <a href="/register" className="underline decoration-dotted text-linkcolor hover:text-textcolor">
           Register
         </a>
       </p>

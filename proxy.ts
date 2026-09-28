@@ -1,32 +1,12 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { adminAuth } from "@/lib/admin-auth";
 import { auth } from "@/lib/auth";
+import { canAdminAccessPath } from "@/lib/permissions/permissions";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
-const ROLE_ADMIN = "ADMIN";
-const ROLE_SUPER = "SUPER_ADMIN";
-const ROLE_DEV = "DEVELOPER";
-
-const isUnder = (pathname: string, base: string) =>
-  pathname === base || pathname.startsWith(base + "/");
-
-const getRoleHomePath = (role?: string) => {
-  switch (role) {
-    case ROLE_DEV:
-      return "/developer";
-    case ROLE_SUPER:
-      return "/super-admin";
-    case ROLE_ADMIN:
-      return "/admin";
-    default:
-      return "/";
-  }
-};
-
-const redirectToHome = (url: URL, role?: string) => {
-  url.pathname = getRoleHomePath(role);
-  url.searchParams.delete("callbackUrl");
-  return NextResponse.redirect(url);
-};
+const LEVEL_ADMIN = "ADMIN";
+const LEVEL_SUPER = "SUPER_ADMIN";
+const LEVEL_DEV = "DEVELOPER";
 
 export async function proxy(req: NextRequest) {
   const url = req.nextUrl.clone();
@@ -34,14 +14,16 @@ export async function proxy(req: NextRequest) {
 
   // Public routes – no auth required
   const publicPrefixes = [
-    "/",
-    "/login",
-    "/register",
     "/api/auth",
     "/favicon.ico",
     "/_next",
     "/assets",
     "/public",
+    "/forgot",
+    "/register",
+    "/login",
+    "/admin/login",
+    "/admin/register",
   ];
 
   for (const p of publicPrefixes) {
@@ -50,56 +32,133 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  // Get session + role for all protected routes
-  const session = await auth();
-  const role = (session?.user as any)?.role as string | undefined;
+  // Get session + level for all protected routes
+  try {
+    // Get user session (from /api/auth)
+    const userSession = await auth();
+    const userType = (userSession?.user as any)?.userType as string | undefined;
+    const userId = userSession?.user?.id ? BigInt(userSession.user.id) : null;
 
-  const requireLogin = (redirectTo = "/login") => {
-    url.pathname = redirectTo;
-    url.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(url);
-  };
+    // Get admin session (from /api/auth/admin)
+    const adminSession = await adminAuth();
+    const adminLevel = (adminSession?.user as any)?.level as string | undefined;
+    const adminId = adminSession?.user?.id ? BigInt(adminSession.user.id) : null;
 
-  // If someone manually goes to /unauthorized, send them to their home page
-  if (pathname === "/unauthorized") {
-    if (!session?.user) return requireLogin();
-    return redirectToHome(url, role);
-  }
+    // console.log('[proxy] User session:', userSession?.user?.email, 'userType:', userType);
+    // console.log('[proxy] Admin session:', adminSession?.user?.email, 'level:', adminLevel);
 
-  // /developer → only DEVELOPER
-  if (isUnder(pathname, "/developer")) {
-    if (!session?.user) return requireLogin();
-    if (role !== ROLE_DEV) {
-      // Not allowed here → send them to their own section (/admin, /super-admin, etc.)
-      return redirectToHome(url, role);
+    const requireUserLogin = (redirectTo = "/login") => {
+      url.pathname = redirectTo;
+      url.searchParams.set("callbackUrl", pathname);
+      return NextResponse.redirect(url);
+    };
+
+    const requireAdminLogin = (redirectTo = "/admin/login") => {
+      url.pathname = redirectTo;
+      url.searchParams.set("callbackUrl", pathname);
+      return NextResponse.redirect(url);
+    };
+
+    const redirectToHome = () => {
+      url.pathname = "/";
+      url.searchParams.delete("callbackUrl");
+      return NextResponse.redirect(url);
+    };
+
+    const redirectToAdminHome = () => {
+      url.pathname = "/admin";
+      url.searchParams.delete("callbackUrl");
+      return NextResponse.redirect(url);
+    };
+
+    // Handle user login page
+    if (pathname === "/login") {
+      if (userSession?.user) {
+        url.pathname = "/";
+        url.searchParams.delete("callbackUrl");
+        return NextResponse.redirect(url);
+      }
+      return NextResponse.next();
     }
+
+    // Handle admin login page
+    if (pathname === "/admin/login") {
+      if (adminSession?.user) {
+        url.pathname = "/admin";
+        url.searchParams.delete("callbackUrl");
+        return NextResponse.redirect(url);
+      }
+      return NextResponse.next();
+    }
+
+    // Handle root path
+    if (pathname === "/") {
+      if (!userSession?.user) {
+        return requireUserLogin();
+      }
+      return NextResponse.next();
+    }
+
+    // Handle unauthorized page
+    if (pathname === "/unauthorized") {
+      if (!userSession?.user && !adminSession?.user) {
+        return requireUserLogin();
+      }
+      if (adminSession?.user) {
+        return redirectToAdminHome();
+      }
+      return redirectToHome();
+    }
+
+    // ===== CUSTOMER/USER ROUTES =====
+    if (!pathname.startsWith("/admin")) {
+      // Customers can access their own pages
+      if (!userSession?.user) {
+        return requireUserLogin();
+      }
+      // Admins should not access user routes
+      if (userType === "ADMIN") {
+        return redirectToAdminHome();
+      }
+      return NextResponse.next();
+    }
+
+    // ===== ADMIN ROUTES =====
+    if (pathname.startsWith("/admin")) {
+      // All admin routes require admin authentication
+      if (!adminSession?.user) {
+        return requireAdminLogin();
+      }
+
+      // DEVELOPER has full access
+      if (adminLevel === LEVEL_DEV) {
+        // console.log('[proxy] DEVELOPER - full access');
+        return NextResponse.next();
+      }
+
+      // SUPER_ADMIN and ADMIN: check permissions
+      if ((adminLevel === LEVEL_SUPER || adminLevel === LEVEL_ADMIN) && adminId) {
+        const hasAccess = await canAdminAccessPath(adminId, pathname);
+        // console.log('[proxy] Admin access check:', hasAccess);
+        if (!hasAccess) {
+          return redirectToAdminHome();
+        }
+        return NextResponse.next();
+      }
+
+      return redirectToAdminHome();
+    }
+
+    return NextResponse.next();
+  } catch (error) {
+    console.error("Proxy error:", error);
     return NextResponse.next();
   }
-
-  // /super-admin → SUPER_ADMIN and DEVELOPER
-  if (isUnder(pathname, "/super-admin")) {
-    if (!session?.user) return requireLogin();
-    if (role === ROLE_SUPER || role === ROLE_DEV) {
-      return NextResponse.next();
-    }
-    // Admin / other roles not allowed → home
-    return redirectToHome(url, role);
-  }
-
-  // /admin → ADMIN, SUPER_ADMIN, DEVELOPER
-  if (isUnder(pathname, "/admin")) {
-    if (!session?.user) return requireLogin();
-    if (role === ROLE_ADMIN || role === ROLE_SUPER || role === ROLE_DEV) {
-      return NextResponse.next();
-    }
-    return redirectToHome(url, role);
-  }
-
-  // Everything else – allow
-  return NextResponse.next();
 }
 
 // IMPORTANT: matcher must match your actual route prefixes
 export const config = {
-  matcher: ["/admin/:path*", "/super-admin/:path*", "/developer/:path*", "/unauthorized"],
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|public).*)",
+  ],
 };

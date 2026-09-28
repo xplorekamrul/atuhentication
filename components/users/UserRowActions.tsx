@@ -65,7 +65,7 @@ export default function UserRowActions({ user, onChanged, disabled: disabledProp
       <button
         aria-label={disabled ? "Actions disabled" : "Actions"}
         onClick={() => { if (!disabled) setOpenMenu(v => !v); }}
-        className={`h-8 w-8 grid place-items-center rounded-md border border-border
+        className={`h-8 w-8 grid place-items-center rounded-md border border-border cursor-pointer
           ${disabled ? "opacity-50 pointer-events-none" : "hover:bg-light"}`}
         disabled={disabled}
         title={disabled ? "Actions are disabled for Developer users" : "Actions"}
@@ -81,7 +81,7 @@ export default function UserRowActions({ user, onChanged, disabled: disabledProp
           {statusOptions.map(opt => (
             <button
               key={opt.key}
-              className={`w-full flex items-center gap-2 px-3 py-2 hover:bg-light ${opt.className}`}
+              className={`w-full flex items-center gap-2 px-3 py-2 hover:bg-light cursor-pointer ${opt.className}`}
               onClick={() => { setOpenMenu(false); setStatus(opt.key); }}
             >
               {opt.icon} {opt.label}
@@ -89,14 +89,14 @@ export default function UserRowActions({ user, onChanged, disabled: disabledProp
           ))}
 
           <button
-            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-light text-emerald-600"
+            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-light text-emerald-600 cursor-pointer"
             onClick={() => { setOpenMenu(false); setOpenInfo(true); }}
           >
             <Pencil className="h-4 w-4" /> Edit Info
           </button>
 
           <button
-            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-light text-red-600"
+            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-light text-red-600 cursor-pointer"
             onClick={() => { setOpenMenu(false); setOpenPass(true); }}
           >
             <KeyRound className="h-4 w-4" /> Edit Password
@@ -105,7 +105,7 @@ export default function UserRowActions({ user, onChanged, disabled: disabledProp
           <div className="h-px bg-border" />
 
           <button
-            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-light text-destructive"
+            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-light text-destructive cursor-pointer"
             onClick={() => { setOpenMenu(false); remove(); }}
           >
             <Trash2 className="h-4 w-4" /> Delete

@@ -1,8 +1,8 @@
 "use server";
 
-import { actionClient } from "@/lib/safe-action/clients";
-import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/hash";
+import { prisma } from "@/lib/prisma";
+import { actionClient } from "@/lib/safe-action/clients";
 import { loginSchema } from "@/lib/validations/auth";
 
 export const login = actionClient
@@ -10,13 +10,13 @@ export const login = actionClient
   .action(async ({ parsedInput }) => {
     const { email, password } = parsedInput;
 
+    // Try user only
     const user = await prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, password: true, role: true, name: true },
+      select: { id: true, email: true, password: true, name: true },
     });
 
     if (!user) {
-      // Return a clean message (don’t throw to avoid generic serverError)
       return { ok: false as const, message: "No account found with this email." };
     }
 
@@ -25,6 +25,5 @@ export const login = actionClient
       return { ok: false as const, message: "Incorrect password." };
     }
 
-    // Auth session is still handled by NextAuth on the client (signIn).
-    return { ok: true as const, user: { id: user.id, email: user.email, role: user.role, name: user.name } };
+    return { ok: true as const, user: { id: user.id, email: user.email, name: user.name } };
   });

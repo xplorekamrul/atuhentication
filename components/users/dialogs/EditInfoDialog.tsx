@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { useAction } from "next-safe-action/hooks";
 import { updateUserInfo } from "@/actions/users/update-user-info";
+import { useAction } from "next-safe-action/hooks";
+import { useEffect, useMemo, useState } from "react";
 
 type Props = {
   open: boolean;
@@ -33,7 +33,7 @@ export default function EditInfoDialog({ open, onOpenChange, user, onSaved }: Pr
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-30 grid place-items-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-30 grid place-items-center bg-black/40 p-4 text-left">
       <form onSubmit={submit} className="w-full max-w-md rounded-xl border border-border bg-background p-4 shadow-xl">
         <h3 className="text-lg font-semibold mb-3">Edit Info</h3>
         <div className="space-y-3">
@@ -65,10 +65,10 @@ export default function EditInfoDialog({ open, onOpenChange, user, onSaved }: Pr
         ) : null}
 
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={() => onOpenChange(false)} className="px-3 py-2 rounded-md border">
+          <button type="button" onClick={() => onOpenChange(false)} className="px-3 py-2 rounded-md border cursor-pointer">
             Cancel
           </button>
-          <button disabled={status === "executing"} className="px-3 py-2 rounded-md bg-pcolor text-white">
+          <button disabled={status === "executing"} className="px-3 py-2 rounded-md bg-primary text-white cursor-pointer">
             Save
           </button>
         </div>

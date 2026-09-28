@@ -3,15 +3,26 @@
 import { register } from "@/actions/auth/register";
 import type { RegisterValues } from "@/lib/validations/auth";
 import { Eye, EyeOff } from "lucide-react";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { useAction } from "next-safe-action/hooks";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "../ui/button";
 
 export default function RegisterForm() {
+  const router = useRouter();
+  const { data: session } = useSession();
   const { executeAsync, status, result } = useAction(register);
   const [form, setForm] = useState<RegisterValues>({ name: "", username: "", email: "", password: "" });
   const [formError, setFormError] = useState<string | null>(null);
   const [showPw, setShowPw] = useState(false);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (session?.user) {
+      router.push("/");
+    }
+  }, [session, router]);
 
   const fieldErrors = useMemo(() => {
     const errs = (result?.validationErrors ?? {}) as Record<string, string[] | undefined>;
@@ -36,7 +47,12 @@ export default function RegisterForm() {
         password: form.password,
       });
       if (!loginRes?.error) {
-        window.location.href = "/";
+        // User registered and logged in successfully
+        // Wait for session to be updated
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Redirect to home page for users
+        router.push("/");
       } else {
         setFormError(loginRes.error || "Login failed after registration.");
       }
@@ -61,7 +77,7 @@ export default function RegisterForm() {
             text-foreground placeholder:text-muted-foreground
             focus:outline-none focus:ring-2 focus:ring-sidebar-ring
           "
-          placeholder="Jane Doe"
+          placeholder="Your Name "
           aria-invalid={!!fieldErrors.name}
           aria-describedby={fieldErrors.name ? "name-error" : undefined}
         />
@@ -84,7 +100,7 @@ export default function RegisterForm() {
             text-foreground placeholder:text-muted-foreground
             focus:outline-none focus:ring-2 focus:ring-sidebar-ring
           "
-          placeholder="janedoe"
+          placeholder="username"
           aria-invalid={!!fieldErrors.username}
           aria-describedby={fieldErrors.username ? "username-error" : undefined}
         />
@@ -144,7 +160,7 @@ export default function RegisterForm() {
             onClick={() => setShowPw((v) => !v)}
             className="
               absolute inset-y-0 right-2 my-auto inline-flex h-8 w-8 items-center justify-center
-              rounded-md text-muted-foreground hover:text-hcolor
+              rounded-md text-muted-foreground hover:text-textcolor
               focus:outline-none focus:ring-2 focus:ring-sidebar-ring
             "
             aria-label={showPw ? "Hide password" : "Show password"}
@@ -160,13 +176,13 @@ export default function RegisterForm() {
 
       {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
 
-      <button
+      <Button
         type="submit"
         disabled={status === "executing"}
         className="
           w-full inline-flex items-center justify-center gap-2
-          rounded-lg bg-pcolor text-white py-2.5
-          hover:bg-scolor transition-colors
+          rounded-lg bg-primary text-white py-2.5
+          hover:bg-primary/80 transition-colors
           disabled:opacity-60
           focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sidebar-ring
         "
@@ -182,11 +198,11 @@ export default function RegisterForm() {
         ) : (
           "Create account"
         )}
-      </button>
+      </Button>
 
       <p className="text-sm text-center text-muted-foreground">
         Already have an account?{" "}
-        <a href="/login" className="underline decoration-dotted text-linkcolor hover:text-hcolor">
+        <a href="/login" className="underline decoration-dotted text-linkcolor hover:text-textcolor">
           Login
         </a>
       </p>
