@@ -126,21 +126,21 @@ model RoleRouteGroup {
  */
 
 model User {
-  id             BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
-  name           String?          @db.VarChar(50)
-  email          String?          @unique @db.VarChar(50)
-  username       String?          @unique @db.VarChar(50)
-  emailVerified  DateTime?        @map("email_verified")
-  password       String?          @db.VarChar(255)
+  id             BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  name           String?        @db.VarChar(50)
+  email          String?        @unique @db.VarChar(50)
+  username       String?        @unique @db.VarChar(50)
+  emailVerified  DateTime?      @map("email_verified")
+  password       String?        @db.VarChar(255)
   image          String?
-  status         AccountStatus    @default(ACTIVE)
-  suspendedAt    DateTime?        @map("suspended_at")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
-  userType       UserType         @default(USER)
-  sessionVersion Int              @default(1) @map("session_version")
-  profile        Profile?         @relation("UserProfile")
-  loginHistory   LoginHistory[]   @relation("UserLoginHistory")
+  status         AccountStatus  @default(ACTIVE)
+  suspendedAt    DateTime?      @map("suspended_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  userType       UserType       @default(USER)
+  sessionVersion Int            @default(1) @map("session_version")
+  profile        Profile?       @relation("UserProfile")
+  loginHistory   LoginHistory[] @relation("UserLoginHistory")
   oauthAccounts  OAuthAccount[]
 
   @@index([email], map: "users_email_idx")
@@ -237,4 +237,18 @@ model OAuthAccount {
   @@unique([provider, providerAccountId])
   @@index([userId], map: "oauth_accounts_user_id_fkey")
   @@map("oauth_accounts")
+}
+
+/**
+ * ===== Theme Model =====
+ */
+model Theme {
+  id        BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  name      String   @unique @db.VarChar(100)
+  colors    Json
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("themes")
 }

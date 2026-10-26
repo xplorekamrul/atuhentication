@@ -12,6 +12,7 @@ import {
   Home,
   LogOut,
   Menu,
+  Palette,
   ShieldAlert,
   Users
 } from "lucide-react";
@@ -48,6 +49,7 @@ function initials(name?: string | null, email?: string | null) {
 const hardcodedNav: LocalNavNode[] = [
   { label: "Users", href: "/admin/users", icon: Users },
   { label: "RBAC", href: "/admin/rbac", icon: ShieldAlert },
+  { label: "Themes", href: "/admin/themes", icon: Palette },
 ];
 
 /**
@@ -207,7 +209,7 @@ export default function Sidebar({
         aria-label="Sidebar"
       >
         {/* Header - Fixed */}
-        <div className="flex h-14 items-center justify-between px-2 flex-shrink-0">
+        <div className="flex h-14 items-center justify-between px-2 shrink-0">
           <div
             className={clsx(
               "flex items-center gap-2 overflow-hidden transition-opacity",
@@ -234,7 +236,7 @@ export default function Sidebar({
           <Link
             href="/profile"
             className={clsx(
-              "flex items-center gap-2 p-2 flex-shrink-0 rounded-md hover:bg-white/10 transition-colors",
+              "flex items-center gap-2 p-2 shrink-0 rounded-md hover:bg-white/10 transition-colors",
               collapsed ? "justify-center" : ""
             )}
           >
@@ -405,7 +407,7 @@ export default function Sidebar({
         </nav>
 
         {/* Footer - Fixed */}
-        <div className="border-t border-border p-2 flex flex-col gap-2 flex-shrink-0">
+        <div className="border-t border-border p-2 flex flex-col gap-2 shrink-0">
           {user &&
             maybeWrapWithTooltip(
               <button
