@@ -8,6 +8,7 @@ import { useAction } from "next-safe-action/hooks";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../ui/button";
+import OAuthButtons from "./OAuthButtons";
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -205,6 +206,9 @@ export default function RegisterForm() {
           "Create account"
         )}
       </Button>
+
+      {/* OAuth Sign-Up Buttons */}
+      <OAuthButtons callbackUrl="/" />
 
       <p className="text-sm text-center text-muted-foreground">
         Already have an account?{" "}

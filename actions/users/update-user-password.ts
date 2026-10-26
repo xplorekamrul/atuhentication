@@ -30,7 +30,7 @@ export const updateUserPassword = superAdminActionClient
 
     await prisma.admin.update({
       where: { id },
-      data: { password: pwd },
+      data: { password: pwd, sessionVersion: { increment: 1 } },
       select: { id: true },
     });
 

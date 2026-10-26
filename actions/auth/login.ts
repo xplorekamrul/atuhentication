@@ -34,6 +34,13 @@ export const login = actionClient
       return { ok: false as const, message: "No account found with this email." };
     }
 
+    if (!user.password) {
+      return {
+        ok: false as const,
+        message: "This account was created with Google or Facebook. Please sign in using the OAuth buttons.",
+      };
+    }
+
     const match = await verifyPassword(password, user.password);
     if (!match) {
       return { ok: false as const, message: "Incorrect password." };

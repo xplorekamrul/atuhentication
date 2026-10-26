@@ -32,7 +32,7 @@ export const updateUserStatus = superAdminActionClient
 
     const data: Prisma.AdminUpdateInput =
       status === "SUSPENDED"
-        ? { status: status as $Enums.AccountStatus, suspendedAt: new Date() }
+        ? { status: status as $Enums.AccountStatus, suspendedAt: new Date(), sessionVersion: { increment: 1 } }
         : { status: status as $Enums.AccountStatus, suspendedAt: null };
 
     const admin = await prisma.admin.update({

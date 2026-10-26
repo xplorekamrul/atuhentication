@@ -7,6 +7,7 @@ declare module "next-auth" {
       userType: "ADMIN" | "USER";
       level?: "ADMIN" | "SUPER_ADMIN" | "DEVELOPER";
       status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+      sessionVersion?: number;
     } & DefaultSession["user"];
   }
 
@@ -15,6 +16,7 @@ declare module "next-auth" {
     userType: "ADMIN" | "USER";
     level?: "ADMIN" | "SUPER_ADMIN" | "DEVELOPER";
     status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+    sessionVersion?: number;
   }
 }
 
@@ -24,6 +26,6 @@ declare module "next-auth/jwt" {
     userType: "ADMIN" | "USER";
     level?: "ADMIN" | "SUPER_ADMIN" | "DEVELOPER";
     status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+    sessionVersion?: number;
   }
 }
-

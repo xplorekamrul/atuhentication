@@ -31,22 +31,23 @@ enum UserType {
  */
 
 model Admin {
-  id            BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
-  name          String?        @db.VarChar(50)
-  email         String?        @unique @db.VarChar(50)
-  username      String?        @unique @db.VarChar(50)
-  emailVerified DateTime?      @map("email_verified")
-  password      String         @db.VarChar(255)
-  image         String?
-  status        AccountStatus  @default(ACTIVE)
-  suspendedAt   DateTime?      @map("suspended_at")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  level         AdminLevel     @default(ADMIN)
-  userType      UserType       @default(ADMIN)
-  adminRoles    AdminRole[]
-  profile       Profile?       @relation("AdminProfile")
-  loginHistory  LoginHistory[] @relation("AdminLoginHistory")
+  id             BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  name           String?        @db.VarChar(50)
+  email          String?        @unique @db.VarChar(50)
+  username       String?        @unique @db.VarChar(50)
+  emailVerified  DateTime?      @map("email_verified")
+  password       String         @db.VarChar(255)
+  image          String?
+  status         AccountStatus  @default(ACTIVE)
+  suspendedAt    DateTime?      @map("suspended_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  level          AdminLevel     @default(ADMIN)
+  userType       UserType       @default(ADMIN)
+  sessionVersion Int            @default(1) @map("session_version")
+  adminRoles     AdminRole[]
+  profile        Profile?       @relation("AdminProfile")
+  loginHistory   LoginHistory[] @relation("AdminLoginHistory")
 
   @@index([email], map: "admins_email_idx")
   @@index([username], map: "admins_username_idx")
@@ -125,20 +126,22 @@ model RoleRouteGroup {
  */
 
 model User {
-  id            BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
-  name          String?        @db.VarChar(50)
-  email         String?        @unique @db.VarChar(50)
-  username      String?        @unique @db.VarChar(50)
-  emailVerified DateTime?      @map("email_verified")
-  password      String         @db.VarChar(255)
-  image         String?
-  status        AccountStatus  @default(ACTIVE)
-  suspendedAt   DateTime?      @map("suspended_at")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  userType      UserType       @default(USER)
-  profile       Profile?       @relation("UserProfile")
-  loginHistory  LoginHistory[] @relation("UserLoginHistory")
+  id             BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  name           String?          @db.VarChar(50)
+  email          String?          @unique @db.VarChar(50)
+  username       String?          @unique @db.VarChar(50)
+  emailVerified  DateTime?        @map("email_verified")
+  password       String?          @db.VarChar(255)
+  image          String?
+  status         AccountStatus    @default(ACTIVE)
+  suspendedAt    DateTime?        @map("suspended_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  userType       UserType         @default(USER)
+  sessionVersion Int              @default(1) @map("session_version")
+  profile        Profile?         @relation("UserProfile")
+  loginHistory   LoginHistory[]   @relation("UserLoginHistory")
+  oauthAccounts  OAuthAccount[]
 
   @@index([email], map: "users_email_idx")
   @@index([username], map: "users_username_idx")
@@ -206,4 +209,32 @@ model PasswordResetOtp {
   @@index([email], map: "password_reset_otp_email_idx")
   @@index([expiresAt], map: "password_reset_otp_expires_at_idx")
   @@map("password_reset_otp")
+}
+
+/**
+ * ===== OAuth Models =====
+ */
+
+model OAuthAccount {
+  id                BigInt  @id @default(autoincrement()) @db.UnsignedBigInt
+  userId            BigInt  @map("user_id") @db.UnsignedBigInt
+  type              String  @db.VarChar(50)
+  provider          String  @db.VarChar(50)
+  providerAccountId String  @map("provider_account_id") @db.VarChar(255)
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String? @db.VarChar(50)
+  scope             String? @db.VarChar(255)
+  id_token          String? @db.Text
+  session_state     String? @db.VarChar(255)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([provider, providerAccountId])
+  @@index([userId], map: "oauth_accounts_user_id_fkey")
+  @@map("oauth_accounts")
 }

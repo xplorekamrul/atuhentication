@@ -73,6 +73,13 @@ export const changePassword = actionClient
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user) return { ok: false as const, message: "User not found" };
 
+      if (!user.password) {
+         return {
+            ok: false as const,
+            message: "This account was created with OAuth and does not have a password set.",
+         };
+      }
+
       const match = await verifyPassword(oldPassword, user.password);
       if (!match) {
          return { ok: false as const, message: "Incorrect current password" };
@@ -82,7 +89,7 @@ export const changePassword = actionClient
 
       await prisma.user.update({
          where: { id: userId },
-         data: { password: hashedPassword },
+         data: { password: hashedPassword, sessionVersion: { increment: 1 } },
       });
 
       return { ok: true as const, message: "Password updated successfully" };

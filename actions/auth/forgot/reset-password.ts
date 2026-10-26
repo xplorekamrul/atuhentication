@@ -20,13 +20,37 @@ export const resetPassword = actionClient
     if (!payload) return { ok: false as const, message: "Reset session expired or invalid." };
 
     const email = payload.email.toLowerCase().trim();
-    const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-    if (!user) return { ok: false as const, message: "User not found." };
-
     const pwd = await hashPassword(password);
-    await prisma.user.update({ where: { id: user.id }, data: { password: pwd } });
 
-    cookieStore.delete("reset_token");
+    // Try finding regular user
+    const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    if (user) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          password: pwd,
+          sessionVersion: { increment: 1 },
+        },
+      });
 
-    return { ok: true as const };
+      cookieStore.delete("reset_token");
+      return { ok: true as const };
+    }
+
+    // Try finding admin
+    const admin = await prisma.admin.findUnique({ where: { email }, select: { id: true } });
+    if (admin) {
+      await prisma.admin.update({
+        where: { id: admin.id },
+        data: {
+          password: pwd,
+          sessionVersion: { increment: 1 },
+        },
+      });
+
+      cookieStore.delete("reset_token");
+      return { ok: true as const };
+    }
+
+    return { ok: false as const, message: "Account not found." };
   });

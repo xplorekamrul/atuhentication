@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
+import OAuthButtons from "./OAuthButtons";
 
 export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?: string }) {
   const router = useRouter();
@@ -155,6 +156,9 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
           "Sign in"
         )}
       </Button>
+
+      {/* OAuth Sign-In Buttons */}
+      <OAuthButtons callbackUrl={callbackUrl} />
 
       <p className="text-sm text-center text-muted-foreground">
         No account?{" "}

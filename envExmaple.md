@@ -36,4 +36,11 @@ RESET_TOKEN_TTL_MIN=15
 # App URL for server-side fetches
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 
+# ---------- OAuth Credentials ----------
+# Get from https://console.cloud.google.com/apis/credentials
+GOOGLE_CLIENT_ID="YOUR_GOOGLE_CLIENT_ID"
+GOOGLE_CLIENT_SECRET="YOUR_GOOGLE_CLIENT_SECRET"
 
+# Get from https://developers.facebook.com/apps
+FACEBOOK_CLIENT_ID="YOUR_FACEBOOK_CLIENT_ID"
+FACEBOOK_CLIENT_SECRET="YOUR_FACEBOOK_CLIENT_SECRET"

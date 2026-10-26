@@ -84,6 +84,13 @@ export const changePassword = actionClient
          return { ok: false as const, message: "User not found" };
       }
 
+      if (!user.password) {
+         return {
+            ok: false as const,
+            message: "This account was created with OAuth and does not have a password set.",
+         };
+      }
+
       // Verify old password
       const isPasswordValid = await verifyPassword(parsedInput.oldPassword, user.password);
 
@@ -96,7 +103,7 @@ export const changePassword = actionClient
 
       await prisma.user.update({
          where: { id: userId },
-         data: { password: hashedPassword },
+         data: { password: hashedPassword, sessionVersion: { increment: 1 } },
       });
 
       revalidatePath("/profile");
