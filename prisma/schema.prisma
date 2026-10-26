@@ -220,7 +220,7 @@ model OAuthAccount {
   userId            BigInt  @map("user_id") @db.UnsignedBigInt
   type              String  @db.VarChar(50)
   provider          String  @db.VarChar(50)
-  providerAccountId String  @map("provider_account_id") @db.VarChar(255)
+  providerAccountId String  @map("provider_account_id") @db.VarChar(191)
   refresh_token     String? @db.Text
   access_token      String? @db.Text
   expires_at        Int?
