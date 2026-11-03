@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { recordLoginHistory } from "@/lib/login-history";
 import { OAuth2Client } from "google-auth-library";
 import { encode } from "next-auth/jwt";
 import { cookies } from "next/headers";
@@ -108,14 +109,13 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Record admin login history
+      // Record admin login history (keeping only last 20)
       try {
-        await prisma.loginHistory.create({
-          data: {
-            adminId: admin.id,
-            ipAddress: ip,
-            userAgent,
-          },
+        await recordLoginHistory({
+          adminId: admin.id,
+          ipAddress: ip,
+          userAgent,
+          maxKeep: 20,
         });
       } catch (logErr) {
         console.error("[GoogleOneTap API] Failed to log admin history:", logErr);
@@ -203,14 +203,13 @@ export async function POST(req: NextRequest) {
         console.error("[GoogleOneTap API] Failed to link OAuthAccount:", oauthErr);
       }
 
-      // Record user login history
+      // Record user login history (keeping only last 20)
       try {
-        await prisma.loginHistory.create({
-          data: {
-            userId: user.id,
-            ipAddress: ip,
-            userAgent,
-          },
+        await recordLoginHistory({
+          userId: user.id,
+          ipAddress: ip,
+          userAgent,
+          maxKeep: 20,
         });
       } catch (logErr) {
         console.error("[GoogleOneTap API] Failed to log user history:", logErr);

@@ -7,6 +7,7 @@ import GoogleProvider from "next-auth/providers/google";
 import FacebookProvider from "next-auth/providers/facebook";
 import "server-only";
 import { prisma } from "./prisma";
+import { recordLoginHistory } from "./login-history";
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
@@ -56,12 +57,11 @@ export const authOptions: NextAuthOptions = {
             let ua = (headers?.["user-agent"] as string) || "Unknown User Agent";
             if (Array.isArray(ua)) ua = ua[0];
 
-            await prisma.loginHistory.create({
-              data: {
-                adminId: admin.id,
-                ipAddress: ip,
-                userAgent: ua,
-              },
+            await recordLoginHistory({
+              adminId: admin.id,
+              ipAddress: ip,
+              userAgent: ua,
+              maxKeep: 20,
             });
           } catch (error) {
             console.error("Failed to record admin login history:", error);
@@ -111,12 +111,11 @@ export const authOptions: NextAuthOptions = {
           let ua = (headers?.["user-agent"] as string) || "Unknown User Agent";
           if (Array.isArray(ua)) ua = ua[0];
 
-          await prisma.loginHistory.create({
-            data: {
-              userId: user.id,
-              ipAddress: ip,
-              userAgent: ua,
-            },
+          await recordLoginHistory({
+            userId: user.id,
+            ipAddress: ip,
+            userAgent: ua,
+            maxKeep: 20,
           });
         } catch (error) {
           console.error("Failed to record user login history:", error);
