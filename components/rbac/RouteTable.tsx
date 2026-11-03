@@ -3,23 +3,18 @@
 import { deleteRoute, listRoutes } from "@/actions/rbac/routes";
 import { Button } from "@/components/ui/button";
 import {
-   Card,
-   CardContent,
-   CardFooter,
-   CardHeader,
-   CardTitle,
-} from "@/components/ui/card";
-import {
    Select,
    SelectContent,
    SelectItem,
    SelectTrigger,
    SelectValue,
 } from "@/components/ui/select";
-import { Edit2, Plus, Search, Trash2 } from "lucide-react";
+import { Edit2, Plus, Search } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, useMemo } from "react";
 import RouteDialog from "./RouteDialog";
+import { DataTable, ColumnDef } from "@/components/shared/data-table";
+import { DeleteConfirmDialog } from "@/components/shared/DeleteConfirmDialog";
 
 type RouteItem = {
    id: string | bigint;
@@ -62,52 +57,43 @@ export default function RouteTable({
    const { executeAsync: doDelete } = useAction(deleteRoute);
    const { executeAsync: doList } = useAction(listRoutes);
 
-   // Fetch initial data on mount
    useEffect(() => {
-      handleSearch();
+      fetchRoutes(1, q, groupId);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
 
-   async function handleSearch() {
+   function fetchRoutes(targetPage = page, searchTerm = q, filterGroupId = groupId) {
       startTransition(async () => {
          const result = await doList({
-            page: 1,
+            page: targetPage,
             pageSize: 10,
-            q: q.trim(),
-            groupId: groupId !== "all" ? groupId : undefined,
+            q: searchTerm.trim(),
+            groupId: filterGroupId !== "all" ? filterGroupId : undefined,
          });
          if (result?.data?.ok) {
             setData(result.data);
-            setPage(1);
+            setPage(targetPage);
          }
       });
    }
 
-   async function handleDelete(id: string, path: string) {
-      if (!confirm(`Delete route "${path}"?`)) return;
+   const handleSearchSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      fetchRoutes(1, q, groupId);
+   };
 
-      startTransition(async () => {
-         const result = await doDelete({ id });
-         if (result?.data?.ok) {
-            await handleSearch();
-         } else {
-            alert(result?.data?.error || "Failed to delete route");
-         }
-      });
-   }
+   const handleGroupChange = (newGroupId: string) => {
+      setGroupId(newGroupId);
+      fetchRoutes(1, q, newGroupId);
+   };
 
-   async function handlePageChange(newPage: number) {
-      startTransition(async () => {
-         const result = await doList({
-            page: newPage,
-            pageSize: 10,
-            q: q.trim(),
-            groupId: groupId !== "all" ? groupId : undefined,
-         });
-         if (result?.data?.ok) {
-            setData(result.data);
-            setPage(newPage);
-         }
-      });
+   async function handleDelete(id: string) {
+      const result = await doDelete({ id });
+      if (result?.data?.ok) {
+         fetchRoutes(page, q, groupId);
+      } else {
+         alert(result?.data?.error || "Failed to delete route");
+      }
    }
 
    function handleEdit(route: RouteItem) {
@@ -123,217 +109,180 @@ export default function RouteTable({
    async function handleDialogClose(refreshed: boolean) {
       setShowDialog(false);
       if (refreshed) {
-         await handleSearch();
+         fetchRoutes(page, q, groupId);
       }
    }
 
-   const { items, total, pageSize } = data;
-   const totalPages = Math.ceil(total / pageSize);
+   const columns: ColumnDef<RouteItem>[] = useMemo(
+      () => [
+         {
+            header: "Path",
+            accessorKey: "path",
+            sortable: true,
+            cell: (route) => <span className="font-mono text-xs font-medium">{route.path}</span>,
+         },
+         {
+            header: "Name",
+            accessorKey: "name",
+            sortable: true,
+            cell: (route) => <span className="text-sm">{route.name || "—"}</span>,
+         },
+         {
+            header: "Route Group",
+            cell: (route) => (
+               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                  {route.group?.name || "—"}
+               </span>
+            ),
+         },
+         {
+            header: "Visible To",
+            cell: (route) => (
+               <div className="flex flex-col gap-0.5 text-xs font-medium">
+                  {route.visibleToAdmin && (
+                     <span className="text-blue-600 dark:text-blue-400">ADMIN</span>
+                  )}
+                  {route.visibleToSuperAdmin && (
+                     <span className="text-purple-600 dark:text-purple-400">SUPER ADMIN</span>
+                  )}
+                  {!route.visibleToAdmin && !route.visibleToSuperAdmin && (
+                     <span className="text-muted-foreground">None</span>
+                  )}
+               </div>
+            ),
+         },
+         {
+            header: "Editable By",
+            cell: (route) => (
+               <div className="flex flex-col gap-0.5 text-xs font-medium">
+                  {route.editableByAdmin && (
+                     <span className="text-blue-600 dark:text-blue-400">ADMIN</span>
+                  )}
+                  {route.editableBySuperAdmin && (
+                     <span className="text-purple-600 dark:text-purple-400">SUPER ADMIN</span>
+                  )}
+                  {!route.editableByAdmin && !route.editableBySuperAdmin && (
+                     <span className="text-muted-foreground">None</span>
+                  )}
+               </div>
+            ),
+         },
+         {
+            header: "Created",
+            accessorKey: "createdAt",
+            sortable: true,
+            cell: (route) => {
+               try {
+                  const date =
+                     typeof route.createdAt === "string"
+                        ? new Date(route.createdAt)
+                        : route.createdAt instanceof Date
+                        ? route.createdAt
+                        : new Date(route.createdAt);
+                  return isNaN(date.getTime())
+                     ? "—"
+                     : date.toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                       });
+               } catch {
+                  return "—";
+               }
+            },
+         },
+         {
+            header: "Actions",
+            className: "text-right",
+            cell: (route) => (
+               <div className="flex items-center justify-end gap-1.5">
+                  <Button
+                     variant="ghost"
+                     size="sm"
+                     onClick={() => handleEdit(route)}
+                     disabled={isPending}
+                     className="h-8 w-8 p-0 cursor-pointer hover:bg-muted"
+                     title="Edit"
+                  >
+                     <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <DeleteConfirmDialog
+                     title="Delete Route"
+                     description={`Are you sure you want to delete route "${route.path}"? This action cannot be undone.`}
+                     onConfirm={() => handleDelete(route.id.toString())}
+                     triggerClassName="h-8 w-8 p-0 border-none bg-transparent hover:bg-destructive/10 text-destructive cursor-pointer"
+                  />
+               </div>
+            ),
+         },
+      ],
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [isPending, page, q, groupId]
+   );
 
    return (
-      <>
-         <Card className="space-y-2 bg-card border-border">
-            <CardHeader className="space-y-2">
-               <CardTitle className="text-lg font-semibold text-tcolor">
-                  Routes
-               </CardTitle>
-
-               <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap items-center gap-2">
-                     <div className="relative">
-                        <input
-                           className="pl-9 pr-3 py-2 rounded-md border border-border bg-background w-72 text-foreground text-sm"
-                           placeholder="Search routes..."
-                           value={q}
-                           onChange={(e) => setQ(e.target.value)}
-                           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                        />
-                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                     </div>
-
-                     <Select value={groupId} onValueChange={setGroupId}>
-                        <SelectTrigger className="w-48">
-                           <SelectValue placeholder="All groups" />
-                        </SelectTrigger>
-                        <SelectContent>
-                           <SelectItem value="all">All groups</SelectItem>
-                           {routeGroups.map((g) => (
-                              <SelectItem key={g.id} value={g.id.toString()}>
-                                 {g.name}
-                              </SelectItem>
-                           ))}
-                        </SelectContent>
-                     </Select>
-
-                     <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleSearch}
-                        disabled={isPending}
-                        className="border-border bg-background hover:bg-light transition"
-                     >
-                        Search
-                     </Button>
+      <div className="space-y-4">
+         <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between flex-wrap">
+            <div className="flex flex-wrap items-center gap-2">
+               <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
+                  <div className="relative">
+                     <input
+                        className="pl-9 pr-3 py-1.5 rounded-sm border border-border bg-background w-60 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        placeholder="Search routes..."
+                        value={q}
+                        onChange={(e) => setQ(e.target.value)}
+                     />
+                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   </div>
-
-                  <Button
-                     onClick={handleCreate}
+                  <button
+                     type="submit"
                      disabled={isPending}
-                     className="inline-flex items-center gap-2 rounded-md px-3 py-2 bg-primary text-primary-foreground hover:bg-scolor transition text-sm"
+                     className="px-3 py-1.5 bg-primary text-primary-foreground rounded-sm text-sm font-medium hover:opacity-90 transition-opacity shadow-sm cursor-pointer disabled:opacity-50"
                   >
-                     <Plus className="h-4 w-4" /> Add Route
-                  </Button>
-               </div>
-            </CardHeader>
+                     Search
+                  </button>
+               </form>
 
-            <CardContent className="pb-0">
-               <div className="overflow-x-auto rounded-lg border border-border bg-card">
-                  <table className="min-w-full text-sm">
-                     <thead className="bg-muted">
-                        <tr className="text-left text-text-hcolor">
-                           <th className="px-4 py-3">Path</th>
-                           <th className="px-4 py-3">Name</th>
-                           <th className="px-4 py-3">Route Group</th>
-                           <th className="px-4 py-3">Visible To</th>
-                           <th className="px-4 py-3">Editable By</th>
-                           <th className="px-4 py-3">Created</th>
-                           <th className="px-4 py-3 text-right">Actions</th>
-                        </tr>
-                     </thead>
-                     <tbody className="text-foreground">
-                        {isPending ? (
-                           Array.from({ length: pageSize }).map((_, idx) => (
-                              <tr
-                                 key={`skeleton-${idx}`}
-                                 className="border-t border-border animate-pulse"
-                              >
-                                 <td className="px-4 py-3">
-                                    <div className="h-4 bg-muted rounded w-40"></div>
-                                 </td>
-                                 <td className="px-4 py-3">
-                                    <div className="h-4 bg-muted rounded w-32"></div>
-                                 </td>
-                                 <td className="px-4 py-3">
-                                    <div className="h-4 bg-muted rounded w-24"></div>
-                                 </td>
-                                 <td className="px-4 py-3">
-                                    <div className="h-4 bg-muted rounded w-24"></div>
-                                 </td>
-                                 <td className="px-4 py-3">
-                                    <div className="h-4 bg-muted rounded w-24"></div>
-                                 </td>
-                                 <td className="px-4 py-3">
-                                    <div className="h-4 bg-muted rounded w-24"></div>
-                                 </td>
-                                 <td className="px-4 py-3">
-                                    <div className="h-8 bg-muted rounded w-16 ml-auto"></div>
-                                 </td>
-                              </tr>
-                           ))
-                        ) : items?.length ? (
-                           items.map((route) => (
-                              <tr key={route.id} className="border-t border-border hover:bg-muted/50">
-                                 <td className="px-4 py-3 font-mono text-xs">{route.path}</td>
-                                 <td className="px-4 py-3 text-sm">{route.name || "-"}</td>
-                                 <td className="px-4 py-3">
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                                       {route.group.name}
-                                    </span>
-                                 </td>
-                                 <td className="px-4 py-3 text-xs">
-                                    <div className="flex flex-col gap-1">
-                                       {route.visibleToAdmin && <span className="text-blue-600">ADMIN</span>}
-                                       {route.visibleToSuperAdmin && <span className="text-purple-600">SUPER ADMIN</span>}
-                                       {!route.visibleToAdmin && !route.visibleToSuperAdmin && <span className="text-muted-foreground">None</span>}
-                                    </div>
-                                 </td>
-                                 <td className="px-4 py-3 text-xs">
-                                    <div className="flex flex-col gap-1">
-                                       {route.editableByAdmin && <span className="text-blue-600">ADMIN</span>}
-                                       {route.editableBySuperAdmin && <span className="text-purple-600">SUPER ADMIN</span>}
-                                       {!route.editableByAdmin && !route.editableBySuperAdmin && <span className="text-muted-foreground">None</span>}
-                                    </div>
-                                 </td>
-                                 <td className="px-4 py-3 text-muted-foreground text-xs">
-                                    {(() => {
-                                       try {
-                                          const date = typeof route.createdAt === 'string'
-                                             ? new Date(route.createdAt)
-                                             : route.createdAt instanceof Date
-                                                ? route.createdAt
-                                                : new Date(route.createdAt);
-                                          return isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-                                       } catch {
-                                          return '—';
-                                       }
-                                    })()}
-                                 </td>
-                                 <td className="px-4 py-3 text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                       <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => handleEdit(route)}
-                                          disabled={isPending}
-                                          className="h-8 w-8 p-0"
-                                          title="Edit"
-                                       >
-                                          <Edit2 className="h-4 w-4" />
-                                       </Button>
-                                       <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => handleDelete(route.id.toString(), route.path)}
-                                          disabled={isPending}
-                                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                                          title="Delete"
-                                       >
-                                          <Trash2 className="h-4 w-4" />
-                                       </Button>
-                                    </div>
-                                 </td>
-                              </tr>
-                           ))
-                        ) : (
-                           <tr>
-                              <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
-                                 No routes found.
-                              </td>
-                           </tr>
-                        )}
-                     </tbody>
-                  </table>
-               </div>
-            </CardContent>
+               <Select value={groupId} onValueChange={handleGroupChange}>
+                  <SelectTrigger className="w-48 h-8.5 rounded-sm text-sm border-border bg-background">
+                     <SelectValue placeholder="All Route Groups" />
+                  </SelectTrigger>
+                  <SelectContent>
+                     <SelectItem value="all">All Route Groups</SelectItem>
+                     {routeGroups.map((group) => (
+                        <SelectItem key={group.id.toString()} value={group.id.toString()}>
+                           {group.name}
+                        </SelectItem>
+                     ))}
+                  </SelectContent>
+               </Select>
+            </div>
 
-            {total > pageSize && (
-               <CardFooter className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
-                     Page {page} of {totalPages} • {total} routes
-                  </p>
-                  <div className="flex gap-2">
-                     <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={page === 1 || isPending}
-                        onClick={() => handlePageChange(page - 1)}
-                        className="border-border bg-background disabled:opacity-50 hover:bg-light transition"
-                     >
-                        Prev
-                     </Button>
-                     <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={page >= totalPages || isPending}
-                        onClick={() => handlePageChange(page + 1)}
-                        className="border-border bg-background disabled:opacity-50 hover:bg-light transition"
-                     >
-                        Next
-                     </Button>
-                  </div>
-               </CardFooter>
-            )}
-         </Card>
+            <button
+               onClick={handleCreate}
+               disabled={isPending}
+               className="inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 bg-primary text-primary-foreground hover:opacity-90 transition-opacity text-sm font-medium shadow-sm cursor-pointer disabled:opacity-50"
+            >
+               <Plus className="h-4 w-4" /> Add Route
+            </button>
+         </div>
+
+         <DataTable<RouteItem>
+            data={data.items}
+            columns={columns}
+            keyExtractor={(route) => route.id.toString()}
+            isLoading={isPending}
+            emptyMessage="No routes found."
+            enableColumnResizing={true}
+            enableRowResizing={true}
+            tableId="rbac-routes-table"
+            pagination={{
+               page,
+               total: data.total,
+               pageSize: data.pageSize,
+               onPageChange: (newPage) => fetchRoutes(newPage, q, groupId),
+            }}
+         />
 
          <RouteDialog
             open={showDialog}
@@ -342,6 +291,6 @@ export default function RouteTable({
             routeGroups={routeGroups}
             onClose={handleDialogClose}
          />
-      </>
+      </div>
    );
 }

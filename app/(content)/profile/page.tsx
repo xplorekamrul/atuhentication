@@ -28,7 +28,7 @@ export default async function ProfilePage() {
             image: true,
             profile: true,
             loginHistory: {
-               take: 10,
+               take: 100,
                orderBy: { createdAt: "desc" },
             },
          },
@@ -43,7 +43,7 @@ export default async function ProfilePage() {
             image: true,
             profile: true,
             loginHistory: {
-               take: 10,
+               take: 100,
                orderBy: { createdAt: "desc" },
             },
          },
@@ -80,7 +80,7 @@ export default async function ProfilePage() {
    }));
 
    return (
-      <div className="p-8 space-y-8 max-w-5xl mx-auto">
+      <div className="p-4 sm:p-8 space-y-8 max-w-5xl mx-auto">
          <h1 className="text-3xl font-bold">My Profile</h1>
 
          <div className="grid gap-8 md:grid-cols-2">

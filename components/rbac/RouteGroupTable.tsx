@@ -2,18 +2,13 @@
 
 import { deleteRouteGroup, listRouteGroups } from "@/actions/rbac/route-groups";
 import { Button } from "@/components/ui/button";
-import {
-   Card,
-   CardContent,
-   CardFooter,
-   CardHeader,
-   CardTitle,
-} from "@/components/ui/card";
-import { Edit2, Plus, Search, Trash2 } from "lucide-react";
+import { Edit2, Link as LinkIcon, Plus, Search } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, useMemo } from "react";
 import AssignRoutesDialog from "./AssignRoutesDialog";
 import RouteGroupDialog from "./RouteGroupDialog";
+import { DataTable, ColumnDef } from "@/components/shared/data-table";
+import { DeleteConfirmDialog } from "@/components/shared/DeleteConfirmDialog";
 
 type RouteGroupItem = {
    id: string | bigint;
@@ -53,42 +48,33 @@ export default function RouteGroupTable({
    const { executeAsync: doDelete } = useAction(deleteRouteGroup);
    const { executeAsync: doList } = useAction(listRouteGroups);
 
-   // Fetch initial data on mount
    useEffect(() => {
-      handleSearch();
+      fetchGroups(1, q);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
 
-   async function handleSearch() {
+   function fetchGroups(targetPage = page, searchTerm = q) {
       startTransition(async () => {
-         const result = await doList({ page: 1, pageSize: 10, q: q.trim() });
+         const result = await doList({ page: targetPage, pageSize: 10, q: searchTerm.trim() });
          if (result?.data?.ok) {
             setData(result.data);
-            setPage(1);
+            setPage(targetPage);
          }
       });
    }
 
-   async function handleDelete(id: string, name: string) {
-      if (!confirm(`Delete route group "${name}"?`)) return;
+   const handleSearchSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      fetchGroups(1, q);
+   };
 
-      startTransition(async () => {
-         const result = await doDelete({ id });
-         if (result?.data?.ok) {
-            await handleSearch();
-         } else {
-            alert(result?.data?.error || "Failed to delete route group");
-         }
-      });
-   }
-
-   async function handlePageChange(newPage: number) {
-      startTransition(async () => {
-         const result = await doList({ page: newPage, pageSize: 10, q: q.trim() });
-         if (result?.data?.ok) {
-            setData(result.data);
-            setPage(newPage);
-         }
-      });
+   async function handleDelete(id: string) {
+      const result = await doDelete({ id });
+      if (result?.data?.ok) {
+         fetchGroups(page, q);
+      } else {
+         alert(result?.data?.error || "Failed to delete route group");
+      }
    }
 
    function handleEdit(group: RouteGroupItem) {
@@ -104,7 +90,7 @@ export default function RouteGroupTable({
    async function handleDialogClose(refreshed: boolean) {
       setShowDialog(false);
       if (refreshed) {
-         await handleSearch();
+         fetchGroups(page, q);
       }
    }
 
@@ -113,198 +99,147 @@ export default function RouteGroupTable({
       setShowAssignDialog(true);
    }
 
-   async function handleAssignClose(refreshed: boolean) {
+   function handleAssignClose(refreshed: boolean) {
       setShowAssignDialog(false);
       if (refreshed) {
-         await handleSearch();
+         fetchGroups(page, q);
       }
    }
 
-   const { items, total, pageSize } = data;
-   const totalPages = Math.ceil(total / pageSize);
+   const columns: ColumnDef<RouteGroupItem>[] = useMemo(
+      () => [
+         {
+            header: "Name",
+            accessorKey: "name",
+            sortable: true,
+            cell: (group) => <span className="font-medium text-foreground">{group.name}</span>,
+         },
+         {
+            header: "Routes",
+            cell: (group) => (
+               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                  {group._count.routes}
+               </span>
+            ),
+         },
+         {
+            header: "Roles",
+            cell: (group) => (
+               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                  {group._count.roleRouteGroups}
+               </span>
+            ),
+         },
+         {
+            header: "Created",
+            accessorKey: "createdAt",
+            sortable: true,
+            cell: (group) => {
+               try {
+                  const date =
+                     typeof group.createdAt === "string"
+                        ? new Date(group.createdAt)
+                        : group.createdAt instanceof Date
+                        ? group.createdAt
+                        : new Date(group.createdAt);
+                  return isNaN(date.getTime())
+                     ? "—"
+                     : date.toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                       });
+               } catch {
+                  return "—";
+               }
+            },
+         },
+         {
+            header: "Actions",
+            className: "text-right",
+            cell: (group) => (
+               <div className="flex items-center justify-end gap-1.5">
+                  <Button
+                     variant="ghost"
+                     size="sm"
+                     onClick={() => handleAssign(group)}
+                     disabled={isPending}
+                     className="h-8 w-8 p-0 cursor-pointer hover:bg-muted"
+                     title="Assign Routes"
+                  >
+                     <LinkIcon className="h-4 w-4" />
+                  </Button>
+                  <Button
+                     variant="ghost"
+                     size="sm"
+                     onClick={() => handleEdit(group)}
+                     disabled={isPending}
+                     className="h-8 w-8 p-0 cursor-pointer hover:bg-muted"
+                     title="Edit"
+                  >
+                     <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <DeleteConfirmDialog
+                     title="Delete Route Group"
+                     description={`Are you sure you want to delete route group "${group.name}"? This action cannot be undone.`}
+                     onConfirm={() => handleDelete(group.id.toString())}
+                     triggerClassName="h-8 w-8 p-0 border-none bg-transparent hover:bg-destructive/10 text-destructive cursor-pointer"
+                  />
+               </div>
+            ),
+         },
+      ],
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [isPending, page, q]
+   );
 
    return (
-      <>
-         <Card className="space-y-2 bg-card border-border">
-            <CardHeader className="space-y-2 p-0">
-               <CardTitle className="text-lg font-semibold text-tcolor">
-                  Route Groups
-               </CardTitle>
-
-               <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap items-center gap-2">
-                     <div className="relative">
-                        <input
-                           className="pl-9 pr-3 py-2 rounded-md border border-border bg-background w-72 text-foreground text-sm"
-                           placeholder="Search route groups..."
-                           value={q}
-                           onChange={(e) => setQ(e.target.value)}
-                           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                        />
-                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                     </div>
-
-                     <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleSearch}
-                        disabled={isPending}
-                        className="border-border bg-background hover:bg-light transition"
-                     >
-                        Search
-                     </Button>
-                  </div>
-
-                  <Button
-                     onClick={handleCreate}
-                     disabled={isPending}
-                     className="inline-flex items-center gap-2 rounded-md px-3 py-2 bg-primary text-primary-foreground hover:bg-scolor transition text-sm"
-                  >
-                     <Plus className="h-4 w-4" /> Add Route Group
-                  </Button>
+      <div className="space-y-4">
+         <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+            <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
+               <div className="relative">
+                  <input
+                     className="pl-9 pr-3 py-1.5 rounded-sm border border-border bg-background w-72 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                     placeholder="Search route groups..."
+                     value={q}
+                     onChange={(e) => setQ(e.target.value)}
+                  />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                </div>
-            </CardHeader>
+               <button
+                  type="submit"
+                  disabled={isPending}
+                  className="px-3 py-1.5 bg-primary text-primary-foreground rounded-sm text-sm font-medium hover:opacity-90 transition-opacity shadow-sm cursor-pointer disabled:opacity-50"
+               >
+                  Search
+               </button>
+            </form>
 
-            <CardContent className="pb-2">
-               <div className="overflow-x-auto rounded-lg border border-border bg-card">
-                  <table className="min-w-full text-sm">
-                     <thead className="bg-muted">
-                        <tr className="text-left text-text-hcolor">
-                           <th className="px-4 py-3">Name</th>
-                           <th className="px-4 py-3">Routes</th>
-                           <th className="px-4 py-3">Assigned Roles</th>
-                           <th className="px-4 py-3">Created</th>
-                           <th className="px-4 py-3 text-right">Actions</th>
-                        </tr>
-                     </thead>
-                     <tbody className="text-foreground">
-                        {isPending ? (
-                           Array.from({ length: pageSize }).map((_, idx) => (
-                              <tr
-                                 key={`skeleton-${idx}`}
-                                 className="border-t border-border animate-pulse"
-                              >
-                                 <td className="px-4 py-3">
-                                    <div className="h-4 bg-muted rounded w-32"></div>
-                                 </td>
-                                 <td className="px-4 py-3">
-                                    <div className="h-4 bg-muted rounded w-8"></div>
-                                 </td>
-                                 <td className="px-4 py-3">
-                                    <div className="h-4 bg-muted rounded w-8"></div>
-                                 </td>
-                                 <td className="px-4 py-3">
-                                    <div className="h-4 bg-muted rounded w-24"></div>
-                                 </td>
-                                 <td className="px-4 py-3">
-                                    <div className="h-8 bg-muted rounded w-16 ml-auto"></div>
-                                 </td>
-                              </tr>
-                           ))
-                        ) : items?.length ? (
-                           items.map((group) => (
-                              <tr key={group.id} className="border-t border-border hover:bg-muted/50">
-                                 <td className="px-4 py-3 font-medium">{group.name}</td>
-                                 <td className="px-4 py-3">
-                                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                                       {group._count.routes}
-                                    </span>
-                                 </td>
-                                 <td className="px-4 py-3">
-                                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                                       {group._count.roleRouteGroups}
-                                    </span>
-                                 </td>
-                                 <td className="px-4 py-3 text-muted-foreground text-xs">
-                                    {(() => {
-                                       try {
-                                          const date = typeof group.createdAt === 'string'
-                                             ? new Date(group.createdAt)
-                                             : group.createdAt instanceof Date
-                                                ? group.createdAt
-                                                : new Date(group.createdAt);
-                                          return isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-                                       } catch {
-                                          return '—';
-                                       }
-                                    })()}
-                                 </td>
-                                 <td className="px-4 py-3 text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                       {/* <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => handleAssign(group)}
-                                          disabled={isPending}
-                                          className="h-8 w-8 p-0"
-                                          title="Assign Routes"
-                                       >
-                                          <Link className="h-4 w-4" />
-                                       </Button> */}
-                                       <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => handleEdit(group)}
-                                          disabled={isPending}
-                                          className="h-8 w-8 p-0"
-                                          title="Edit"
-                                       >
-                                          <Edit2 className="h-4 w-4" />
-                                       </Button>
-                                       <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => handleDelete(group.id.toString(), group.name)}
-                                          disabled={isPending}
-                                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                                          title="Delete"
-                                       >
-                                          <Trash2 className="h-4 w-4" />
-                                       </Button>
-                                    </div>
-                                 </td>
-                              </tr>
-                           ))
-                        ) : (
-                           <tr>
-                              <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                                 No route groups found.
-                              </td>
-                           </tr>
-                        )}
-                     </tbody>
-                  </table>
-               </div>
-            </CardContent>
+            <button
+               onClick={handleCreate}
+               disabled={isPending}
+               className="inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 bg-primary text-primary-foreground hover:opacity-90 transition-opacity text-sm font-medium shadow-sm cursor-pointer disabled:opacity-50"
+            >
+               <Plus className="h-4 w-4" /> Add Route Group
+            </button>
+         </div>
 
-            {total > pageSize && (
-               <CardFooter className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
-                     Page {page} of {totalPages} • {total} route groups
-                  </p>
-                  <div className="flex gap-2">
-                     <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={page === 1 || isPending}
-                        onClick={() => handlePageChange(page - 1)}
-                        className="border-border bg-background disabled:opacity-50 hover:bg-light transition"
-                     >
-                        Prev
-                     </Button>
-                     <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={page >= totalPages || isPending}
-                        onClick={() => handlePageChange(page + 1)}
-                        className="border-border bg-background disabled:opacity-50 hover:bg-light transition"
-                     >
-                        Next
-                     </Button>
-                  </div>
-               </CardFooter>
-            )}
-         </Card>
+         <DataTable<RouteGroupItem>
+            data={data.items}
+            columns={columns}
+            keyExtractor={(group) => group.id.toString()}
+            isLoading={isPending}
+            emptyMessage="No route groups found."
+            enableColumnResizing={true}
+            enableRowResizing={true}
+            tableId="rbac-route-groups-table"
+            pagination={{
+               page,
+               total: data.total,
+               pageSize: data.pageSize,
+               onPageChange: (newPage) => fetchGroups(newPage, q),
+            }}
+         />
 
          <RouteGroupDialog
             open={showDialog}
@@ -320,6 +255,6 @@ export default function RouteGroupTable({
             routes={routes}
             onClose={handleAssignClose}
          />
-      </>
+      </div>
    );
 }

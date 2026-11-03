@@ -2,20 +2,14 @@
 
 import { deleteRole, listRoles } from "@/actions/rbac/roles";
 import { Button } from "@/components/ui/button";
-import {
-   Card,
-   CardContent,
-   CardFooter,
-   CardHeader,
-   CardTitle,
-} from "@/components/ui/card";
-import { Edit2, Link, Plus, Search, Trash2, Users } from "lucide-react";
+import { Edit2, Link, Plus, Search, Users } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
-import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, useMemo } from "react";
 import AssignRouteGroupsDialog from "./AssignRouteGroupsDialog";
 import AssignUsersDialog from "./AssignUsersDialog";
 import RoleDialog from "./RoleDialog";
+import { DataTable, ColumnDef } from "@/components/shared/data-table";
+import { DeleteConfirmDialog } from "@/components/shared/DeleteConfirmDialog";
 
 type RoleItem = {
    id: string | bigint;
@@ -37,7 +31,6 @@ type RouteGroup = {
 };
 
 export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGroup[] }) {
-   const router = useRouter();
    const [isPending, startTransition] = useTransition();
    const [q, setQ] = useState("");
    const [page, setPage] = useState(1);
@@ -52,42 +45,33 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
    const { executeAsync: doDelete } = useAction(deleteRole);
    const { executeAsync: doList } = useAction(listRoles);
 
-   // Fetch initial data on mount
    useEffect(() => {
-      handleSearch();
+      fetchRoles(1, q);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
 
-   async function handleSearch() {
+   function fetchRoles(targetPage = page, searchTerm = q) {
       startTransition(async () => {
-         const result = await doList({ page: 1, pageSize: 10, q: q.trim() });
+         const result = await doList({ page: targetPage, pageSize: 10, q: searchTerm.trim() });
          if (result?.data?.ok) {
             setData(result.data);
-            setPage(1);
+            setPage(targetPage);
          }
       });
    }
 
-   async function handleDelete(id: string, name: string) {
-      if (!confirm(`Delete role "${name}"?`)) return;
+   const handleSearchSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      fetchRoles(1, q);
+   };
 
-      startTransition(async () => {
-         const result = await doDelete({ id });
-         if (result?.data?.ok) {
-            await handleSearch();
-         } else {
-            alert(result?.data?.error || "Failed to delete role");
-         }
-      });
-   }
-
-   async function handlePageChange(newPage: number) {
-      startTransition(async () => {
-         const result = await doList({ page: newPage, pageSize: 10, q: q.trim() });
-         if (result?.data?.ok) {
-            setData(result.data);
-            setPage(newPage);
-         }
-      });
+   async function handleDelete(id: string) {
+      const result = await doDelete({ id });
+      if (result?.data?.ok) {
+         fetchRoles(page, q);
+      } else {
+         alert(result?.data?.error || "Failed to delete role");
+      }
    }
 
    function handleEdit(role: RoleItem) {
@@ -103,7 +87,7 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
    async function handleDialogClose(refreshed: boolean) {
       setShowDialog(false);
       if (refreshed) {
-         await handleSearch();
+         fetchRoles(page, q);
       }
    }
 
@@ -115,7 +99,7 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
    async function handleAssignClose(refreshed: boolean) {
       setShowAssignDialog(false);
       if (refreshed) {
-         await handleSearch();
+         fetchRoles(page, q);
       }
    }
 
@@ -127,205 +111,154 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
    async function handleAssignUsersClose(refreshed: boolean) {
       setShowAssignUsersDialog(false);
       if (refreshed) {
-         await handleSearch();
+         fetchRoles(page, q);
       }
    }
 
-   const { items, total, pageSize } = data;
-   const totalPages = Math.ceil(total / pageSize);
+   const columns: ColumnDef<RoleItem>[] = useMemo(
+      () => [
+         {
+            header: "Name",
+            accessorKey: "name",
+            sortable: true,
+            cell: (role) => <span className="font-medium text-foreground">{role.name}</span>,
+         },
+         {
+            header: "Users",
+            cell: (role) => (
+               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                  {role._count.adminRoles}
+               </span>
+            ),
+         },
+         {
+            header: "Route Groups",
+            cell: (role) => (
+               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                  {role._count.roleRouteGroups}
+               </span>
+            ),
+         },
+         {
+            header: "Created",
+            accessorKey: "createdAt",
+            sortable: true,
+            cell: (role) => {
+               try {
+                  const date =
+                     typeof role.createdAt === "string"
+                        ? new Date(role.createdAt)
+                        : role.createdAt instanceof Date
+                        ? role.createdAt
+                        : new Date(role.createdAt);
+                  return isNaN(date.getTime())
+                     ? "—"
+                     : date.toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                       });
+               } catch {
+                  return "—";
+               }
+            },
+         },
+         {
+            header: "Actions",
+            className: "text-right",
+            cell: (role) => (
+               <div className="flex items-center justify-end gap-1.5">
+                  <Button
+                     variant="ghost"
+                     size="sm"
+                     onClick={() => handleAssignUsers(role)}
+                     disabled={isPending}
+                     className="h-8 w-8 p-0 cursor-pointer hover:bg-muted"
+                     title="Assign Users"
+                  >
+                     <Users className="h-4 w-4" />
+                  </Button>
+                  <Button
+                     variant="ghost"
+                     size="sm"
+                     onClick={() => handleAssign(role)}
+                     disabled={isPending}
+                     className="h-8 w-8 p-0 cursor-pointer hover:bg-muted"
+                     title="Assign Route Groups"
+                  >
+                     <Link className="h-4 w-4" />
+                  </Button>
+                  <Button
+                     variant="ghost"
+                     size="sm"
+                     onClick={() => handleEdit(role)}
+                     disabled={isPending}
+                     className="h-8 w-8 p-0 cursor-pointer hover:bg-muted"
+                     title="Edit"
+                  >
+                     <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <DeleteConfirmDialog
+                     title="Delete Role"
+                     description={`Are you sure you want to delete role "${role.name}"? This action cannot be undone.`}
+                     onConfirm={() => handleDelete(role.id.toString())}
+                     triggerClassName="h-8 w-8 p-0 border-none bg-transparent hover:bg-destructive/10 text-destructive cursor-pointer"
+                  />
+               </div>
+            ),
+         },
+      ],
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [isPending, page, q]
+   );
 
    return (
-      <>
-         <Card className="space-y-2 bg-card border-border">
-            <CardHeader className="space-y-2">
-               <CardTitle className="text-lg font-semibold text-tcolor">
-                  Roles
-               </CardTitle>
-
-               <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap items-center gap-2">
-                     <div className="relative">
-                        <input
-                           className="pl-9 pr-3 py-2 rounded-md border border-border bg-background w-72 text-foreground text-sm"
-                           placeholder="Search roles..."
-                           value={q}
-                           onChange={(e) => setQ(e.target.value)}
-                           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                        />
-                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                     </div>
-
-                     <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleSearch}
-                        disabled={isPending}
-                        className="border-border bg-background hover:bg-light transition cursor-pointer"
-                     >
-                        Search
-                     </Button>
-                  </div>
-
-                  <Button
-                     onClick={handleCreate}
-                     disabled={isPending}
-                     className="inline-flex items-center gap-2 rounded-md px-3 py-2 bg-primary text-primary-foreground hover:bg-scolor transition text-sm cursor-pointer"
-                  >
-                     <Plus className="h-4 w-4" /> Add Role
-                  </Button>
+      <div className="space-y-4">
+         <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+            <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
+               <div className="relative">
+                  <input
+                     className="pl-9 pr-3 py-1.5 rounded-sm border border-border bg-background w-72 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                     placeholder="Search roles..."
+                     value={q}
+                     onChange={(e) => setQ(e.target.value)}
+                  />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                </div>
-            </CardHeader>
+               <button
+                  type="submit"
+                  disabled={isPending}
+                  className="px-3 py-1.5 bg-primary text-primary-foreground rounded-sm text-sm font-medium hover:opacity-90 transition-opacity shadow-sm cursor-pointer disabled:opacity-50"
+               >
+                  Search
+               </button>
+            </form>
 
-            <CardContent className="pb-2">
-               <div className="overflow-x-auto rounded-lg border border-border bg-card">
-                  <table className="min-w-full text-sm">
-                     <thead className="bg-muted">
-                        <tr className="text-left text-text-hcolor">
-                           <th className="px-4 py-3">Name</th>
-                           <th className="px-4 py-3">Users</th>
-                           <th className="px-4 py-3">Route Groups</th>
-                           <th className="px-4 py-3">Created</th>
-                           <th className="px-4 py-3 text-right">Actions</th>
-                        </tr>
-                     </thead>
-                     <tbody className="text-foreground">
-                        {isPending ? (
-                           Array.from({ length: pageSize }).map((_, idx) => (
-                              <tr
-                                 key={`skeleton-${idx}`}
-                                 className="border-t border-border animate-pulse"
-                              >
-                                 <td className="px-4 py-3">
-                                    <div className="h-4 bg-muted rounded w-32"></div>
-                                 </td>
-                                 <td className="px-4 py-3">
-                                    <div className="h-4 bg-muted rounded w-8"></div>
-                                 </td>
-                                 <td className="px-4 py-3">
-                                    <div className="h-4 bg-muted rounded w-8"></div>
-                                 </td>
-                                 <td className="px-4 py-3">
-                                    <div className="h-4 bg-muted rounded w-24"></div>
-                                 </td>
-                                 <td className="px-4 py-3">
-                                    <div className="h-8 bg-muted rounded w-16 ml-auto"></div>
-                                 </td>
-                              </tr>
-                           ))
-                        ) : items?.length ? (
-                           items.map((role) => (
-                              <tr key={role.id} className="border-t border-border hover:bg-muted/50">
-                                 <td className="px-4 py-3 font-medium">{role.name}</td>
-                                 <td className="px-4 py-3">
-                                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                                       {role._count.adminRoles}
-                                    </span>
-                                 </td>
-                                 <td className="px-4 py-3">
-                                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                                       {role._count.roleRouteGroups}
-                                    </span>
-                                 </td>
-                                 <td className="px-4 py-3 text-muted-foreground text-xs">
-                                    {(() => {
-                                       try {
-                                          const date = typeof role.createdAt === 'string'
-                                             ? new Date(role.createdAt)
-                                             : role.createdAt instanceof Date
-                                                ? role.createdAt
-                                                : new Date(role.createdAt);
-                                          return isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-                                       } catch {
-                                          return '—';
-                                       }
-                                    })()}
-                                 </td>
-                                 <td className="px-4 py-3 text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                       <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => handleAssignUsers(role)}
-                                          disabled={isPending}
-                                          className="h-8 w-8 p-0 cursor-pointer"
-                                          title="Assign Users"
-                                       >
-                                          <Users className="h-4 w-4" />
-                                       </Button>
-                                       <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => handleAssign(role)}
-                                          disabled={isPending}
-                                          className="h-8 w-8 p-0 cursor-pointer"
-                                          title="Assign Route Groups"
-                                       >
-                                          <Link className="h-4 w-4" />
-                                       </Button>
-                                       <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => handleEdit(role)}
-                                          disabled={isPending}
-                                          className="h-8 w-8 p-0 cursor-pointer"
-                                          title="Edit"
-                                       >
-                                          <Edit2 className="h-4 w-4" />
-                                       </Button>
-                                       <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => handleDelete(role.id.toString(), role.name)}
-                                          disabled={isPending}
-                                          className="h-8 w-8 p-0 cursor-pointer text-destructive hover:text-destructive"
-                                          title="Delete"
-                                       >
-                                          <Trash2 className="h-4 w-4" />
-                                       </Button>
-                                    </div>
-                                 </td>
-                              </tr>
-                           ))
-                        ) : (
-                           <tr>
-                              <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                                 No roles found.
-                              </td>
-                           </tr>
-                        )}
-                     </tbody>
-                  </table>
-               </div>
-            </CardContent>
+            <button
+               onClick={handleCreate}
+               disabled={isPending}
+               className="inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 bg-primary text-primary-foreground hover:opacity-90 transition-opacity text-sm font-medium shadow-sm cursor-pointer disabled:opacity-50"
+            >
+               <Plus className="h-4 w-4" /> Add Role
+            </button>
+         </div>
 
-            {total > pageSize && (
-               <CardFooter className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
-                     Page {page} of {totalPages} • {total} roles
-                  </p>
-                  <div className="flex gap-2">
-                     <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={page === 1 || isPending}
-                        onClick={() => handlePageChange(page - 1)}
-                        className="border-border bg-background disabled:opacity-50 hover:bg-light transition"
-                     >
-                        Prev
-                     </Button>
-                     <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={page >= totalPages || isPending}
-                        onClick={() => handlePageChange(page + 1)}
-                        className="border-border bg-background disabled:opacity-50 hover:bg-light transition"
-                     >
-                        Next
-                     </Button>
-                  </div>
-               </CardFooter>
-            )}
-         </Card>
+         <DataTable<RoleItem>
+            data={data.items}
+            columns={columns}
+            keyExtractor={(role) => role.id.toString()}
+            isLoading={isPending}
+            emptyMessage="No roles found."
+            enableColumnResizing={true}
+            enableRowResizing={true}
+            tableId="rbac-roles-table"
+            pagination={{
+               page,
+               total: data.total,
+               pageSize: data.pageSize,
+               onPageChange: (newPage) => fetchRoles(newPage, q),
+            }}
+         />
 
          <RoleDialog
             open={showDialog}
@@ -348,6 +281,6 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
             role={assigningUsersRole}
             onClose={handleAssignUsersClose}
          />
-      </>
+      </div>
    );
 }

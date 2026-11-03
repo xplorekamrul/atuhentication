@@ -17,6 +17,7 @@ interface DatePickerProps {
   minDate?: string;
   maxDate?: string;
   defaultToToday?: boolean;
+  defaultMonth?: string;
 }
 
 function parseDateParts(val?: string): { year: number; month: number; day: number } | null {
@@ -61,6 +62,7 @@ export function DatePicker({
   minDate,
   maxDate,
   defaultToToday = false,
+  defaultMonth,
 }: DatePickerProps) {
   const today = new Date().toISOString().split("T")[0];
   const [isOpen, setIsOpen] = React.useState(false);
@@ -68,7 +70,8 @@ export function DatePicker({
     return normalizeDateToYMD(value) || (defaultToToday ? today : "");
   });
   const [displayMonth, setDisplayMonth] = React.useState(() => {
-    const parts = parseDateParts(value);
+    const target = value || defaultMonth || minDate;
+    const parts = parseDateParts(target);
     if (parts) {
       return { month: parts.month, year: parts.year };
     }
@@ -82,7 +85,7 @@ export function DatePicker({
     }
   }, [defaultToToday, value, selectedDate, today, onChange]);
 
-  // Sync selectedDate when value prop changes
+  // Sync selectedDate when value prop changes, or update displayMonth on defaultMonth/minDate changes
   React.useEffect(() => {
     if (value !== undefined) {
       const normalized = normalizeDateToYMD(value);
@@ -93,8 +96,26 @@ export function DatePicker({
           setDisplayMonth({ month: parts.month, year: parts.year });
         }
       }
+    } else {
+      setSelectedDate("");
+      const target = defaultMonth || minDate;
+      const parts = parseDateParts(target);
+      if (parts) {
+        setDisplayMonth({ month: parts.month, year: parts.year });
+      }
     }
-  }, [value, selectedDate]);
+  }, [value, selectedDate, defaultMonth, minDate]);
+
+  // When opening popover without value, ensure displayMonth matches defaultMonth or minDate
+  React.useEffect(() => {
+    if (isOpen && !value) {
+      const target = defaultMonth || minDate;
+      const parts = parseDateParts(target);
+      if (parts) {
+        setDisplayMonth({ month: parts.month, year: parts.year });
+      }
+    }
+  }, [isOpen, value, defaultMonth, minDate]);
 
   const months = [
     "January", "February", "March", "April", "May", "June",
@@ -149,7 +170,9 @@ export function DatePicker({
   const emptyDays = Array.from({ length: firstDay }, (_, i) => i);
 
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 100 }, (_, i) => currentYear - i);
+  const maxYear = Math.max(currentYear + 15, displayMonth.year + 10);
+  const minYear = Math.min(currentYear - 50, displayMonth.year - 50);
+  const years = Array.from({ length: maxYear - minYear + 1 }, (_, i) => maxYear - i);
 
   const isDateDisabled = (day: number) => {
     const dateStr = `${displayMonth.year}-${String(displayMonth.month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -159,9 +182,9 @@ export function DatePicker({
   };
 
   return (
-    <Popover.Root open={isOpen} onOpenChange={(open) => !disabled && setIsOpen(open)}>
+    <Popover.Root open={!disabled && isOpen} onOpenChange={(open) => !disabled && setIsOpen(open)}>
       <Popover.Trigger asChild disabled={disabled} className="w-full">
-        <div className="relative">
+        <div className={cn("relative", disabled && "pointer-events-none opacity-60 cursor-not-allowed")}>
           <Input
             type="text"
             value={selectedDate ? formatDate(selectedDate) : ""}
@@ -184,7 +207,7 @@ export function DatePicker({
 
       <Popover.Portal>
         <Popover.Content
-          className="w-80 rounded-lg border border-border bg-popover text-popover-foreground shadow-lg z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+          className="w-80 rounded-lg border border-border bg-popover text-popover-foreground shadow-lg z-150 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
           align="start"
           sideOffset={5}
         >
@@ -209,6 +232,7 @@ export function DatePicker({
                 }}
                 options={months.map((month, idx) => ({ value: idx.toString(), label: month }))}
                 className="w-32"
+                contentClassName="z-[160]"
                 searchable={true}
               />
               <CustomSelect
@@ -220,6 +244,7 @@ export function DatePicker({
                 }}
                 options={years.map((year) => ({ value: year.toString(), label: year.toString() }))}
                 className="w-24"
+                contentClassName="z-[160]"
                 searchable={true}
                 searchPlaceholder="Search year..."
               />

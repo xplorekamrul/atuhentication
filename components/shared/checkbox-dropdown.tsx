@@ -234,7 +234,7 @@ export function CheckboxDropdown({
                sideOffset={4}
                style={dropdownMinWidth ? { minWidth: dropdownMinWidth } : undefined}
                className={cn(
-                  "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 rounded-md border shadow-md outline-none flex flex-col",
+                  "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-150 rounded-md border shadow-md outline-none flex flex-col",
                   !dropdownMinWidth && !dropdownClassName?.includes("w-") && "w-(--radix-popover-trigger-width)",
                   dropdownClassName,
                )}
@@ -246,7 +246,7 @@ export function CheckboxDropdown({
                <div
                   className={cn(
                      "overflow-y-auto space-y-0.5 py-1 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent hover:scrollbar-thumb-accent/80",
-                     showSetButton ? "max-h-55" : "max-h-75",
+                     showSetButton ? "max-h-220px" : "max-h-300px",
                      listClassName,
                   )}
                >

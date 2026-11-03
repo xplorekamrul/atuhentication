@@ -4,9 +4,10 @@ import { useState, useMemo, type ReactNode } from "react";
 import { useAction } from "next-safe-action/hooks";
 import { updateUserStatus } from "@/actions/users/update-user-status";
 import { deleteUser } from "@/actions/users/delete-user";
-import { Pencil, KeyRound, Trash2, MoreHorizontal, PlayCircle, PauseCircle, UserX, Lock } from "lucide-react";
+import { Pencil, KeyRound, MoreHorizontal, PlayCircle, PauseCircle, UserX, Lock } from "lucide-react";
 import EditInfoDialog from "./dialogs/EditInfoDialog";
 import EditPasswordDialog from "./dialogs/EditPasswordDialog";
+import { DeleteConfirmDialog } from "@/components/shared/DeleteConfirmDialog";
 
 type Role = "DEVELOPER" | "SUPER_ADMIN" | "ADMIN";
 type Status = "ACTIVE" | "INACTIVE" | "SUSPENDED";
@@ -41,13 +42,6 @@ export default function UserRowActions({ user, onChanged, disabled: disabledProp
     if (res?.data?.ok) onChanged();
   }
 
-  async function remove() {
-    if (disabled) return;
-    if (!confirm("Delete this user? This cannot be undone.")) return;
-    const res = await doDelete({ id: user.id });
-    if (res?.data?.ok) onChanged();
-  }
-
   const statusOptions = useMemo((): { key: Status; label: string; icon: ReactNode; className: string }[] => {
     const all = [
       { key: "ACTIVE" as const,   label: "Activate",   icon: <PlayCircle className="h-4 w-4" />,  className: "text-emerald-600" },
@@ -57,16 +51,13 @@ export default function UserRowActions({ user, onChanged, disabled: disabledProp
     return all.filter(o => o.key !== user.status);
   }, [user.status]);
 
-  // If disabled and you want *nothing* visible, early return null:
-  // if (disabled) return null;
-
   return (
-    <div className="relative">
+    <div className="relative inline-flex items-center">
       <button
         aria-label={disabled ? "Actions disabled" : "Actions"}
         onClick={() => { if (!disabled) setOpenMenu(v => !v); }}
         className={`h-8 w-8 grid place-items-center rounded-md border border-border cursor-pointer
-          ${disabled ? "opacity-50 pointer-events-none" : "hover:bg-light"}`}
+          ${disabled ? "opacity-50 pointer-events-none" : "hover:bg-muted"}`}
         disabled={disabled}
         title={disabled ? "Actions are disabled for Developer users" : "Actions"}
       >
@@ -75,13 +66,13 @@ export default function UserRowActions({ user, onChanged, disabled: disabledProp
 
       {openMenu ? (
         <div
-          className="absolute right-0 z-20 mt-2 w-48 rounded-xl border border-border bg-background shadow-lg"
+          className="absolute right-0 top-full z-30 mt-2 w-48 rounded-xl border border-border bg-popover text-popover-foreground shadow-lg overflow-hidden py-1"
           onMouseLeave={() => setOpenMenu(false)}
         >
           {statusOptions.map(opt => (
             <button
               key={opt.key}
-              className={`w-full flex items-center gap-2 px-3 py-2 hover:bg-light cursor-pointer ${opt.className}`}
+              className={`w-full flex items-center gap-2 px-3 py-2 hover:bg-muted cursor-pointer text-sm ${opt.className}`}
               onClick={() => { setOpenMenu(false); setStatus(opt.key); }}
             >
               {opt.icon} {opt.label}
@@ -89,31 +80,41 @@ export default function UserRowActions({ user, onChanged, disabled: disabledProp
           ))}
 
           <button
-            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-light text-emerald-600 cursor-pointer"
+            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted text-emerald-600 cursor-pointer text-sm"
             onClick={() => { setOpenMenu(false); setOpenInfo(true); }}
           >
             <Pencil className="h-4 w-4" /> Edit Info
           </button>
 
           <button
-            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-light text-red-600 cursor-pointer"
+            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted text-foreground cursor-pointer text-sm"
             onClick={() => { setOpenMenu(false); setOpenPass(true); }}
           >
             <KeyRound className="h-4 w-4" /> Edit Password
           </button>
 
-          <div className="h-px bg-border" />
-
-          <button
-            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-light text-destructive cursor-pointer"
-            onClick={() => { setOpenMenu(false); remove(); }}
-          >
-            <Trash2 className="h-4 w-4" /> Delete
-          </button>
+          {!disabled && (
+            <>
+              <div className="h-px bg-border my-1" />
+              <div onClick={() => setOpenMenu(false)}>
+                <DeleteConfirmDialog
+                  triggerClassName="w-full flex items-center justify-start gap-2 px-3 py-2 bg-transparent hover:bg-destructive/10 text-destructive shadow-none rounded-none font-normal text-sm cursor-pointer border-none"
+                  title="Delete User"
+                  description={`Are you sure you want to delete user "${user.name || user.email}"? This action cannot be undone.`}
+                  onConfirm={async () => {
+                    const res = await doDelete({ id: user.id });
+                    if (res?.data?.ok) onChanged();
+                  }}
+                >
+                  Delete User
+                </DeleteConfirmDialog>
+              </div>
+            </>
+          )}
         </div>
       ) : null}
 
-      {/* These dialogs will never open if disabled, but keeping them mounted is harmless */}
+      {/* Dialogs */}
       <EditInfoDialog open={openInfo} onOpenChange={setOpenInfo} user={user} onSaved={onChanged} />
       <EditPasswordDialog open={openPass} onOpenChange={setOpenPass} userId={user.id} onSaved={onChanged} />
     </div>

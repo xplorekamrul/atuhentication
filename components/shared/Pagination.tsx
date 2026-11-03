@@ -1,7 +1,13 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Check, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface PageSizeSelectorProps {
@@ -20,24 +26,44 @@ export function PageSizeSelector({
   className = "",
 }: PageSizeSelectorProps) {
   return (
-    <div className={cn("relative inline-flex items-center", className)}>
-      <select
-        value={pageSize}
-        onChange={(e) => onPageSizeChange(Number(e.target.value))}
+    <DropdownMenu>
+      <DropdownMenuTrigger
         disabled={disabled}
-        aria-label="Rows per page"
         className={cn(
-          "inline-flex h-8 w-full appearance-none items-center justify-between gap-1.5 rounded-md border border-input bg-card pl-2.5 pr-7 text-xs font-medium text-foreground shadow-xs transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer select-none"
+          "inline-flex h-8 items-center justify-between gap-1.5 rounded-md border border-input bg-card px-2.5 text-xs font-medium text-foreground shadow-xs transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer select-none",
+          className
         )}
+        aria-label="Rows per page"
       >
-        {options.map((opt) => (
-          <option key={opt} value={opt} className="bg-popover text-foreground">
-            {opt}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="absolute right-2 h-3.5 w-3.5 text-muted-foreground pointer-events-none transition-transform duration-200" />
-    </div>
+        <span>{pageSize}</span>
+        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        side="top"
+        sideOffset={6}
+        className="min-w-22 rounded-lg border border-border bg-popover p-1 shadow-lg z-50"
+      >
+        {options.map((opt) => {
+          const isSelected = opt === pageSize;
+          return (
+            <DropdownMenuItem
+              key={opt}
+              onClick={() => onPageSizeChange(opt)}
+              className={cn(
+                "flex items-center justify-between px-2.5 py-1.5 text-xs font-medium cursor-pointer rounded-md transition-colors",
+                isSelected
+                  ? "bg-primary/10 text-primary font-semibold"
+                  : "text-foreground hover:bg-muted"
+              )}
+            >
+              <span>{opt}</span>
+              {isSelected && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
