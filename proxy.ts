@@ -21,6 +21,7 @@ export async function proxy(req: NextRequest) {
     "/forgot",
     "/register",
     "/login",
+    "/",
   ];
 
   for (const p of publicPrefixes) {

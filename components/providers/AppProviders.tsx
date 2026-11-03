@@ -1,9 +1,9 @@
 "use client";
 
 import { SessionProvider } from "next-auth/react";
-
 import { useEffect } from "react";
 import { ThemeProvider } from "next-themes";
+import GoogleOneTap from "../auth/GoogleOneTap";
 
 export default function AppProviders({ children }: { children: React.ReactNode }) {
   // Strip Facebook OAuth #_=_ URL fragment
@@ -25,6 +25,7 @@ export default function AppProviders({ children }: { children: React.ReactNode }
         enableSystem
         disableTransitionOnChange
       >
+        <GoogleOneTap />
         {children}
       </ThemeProvider>
     </SessionProvider>
