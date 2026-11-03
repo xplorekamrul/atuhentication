@@ -16,7 +16,7 @@ export const roleDeleteSchema = z.object({
 
 export const roleListSchema = z.object({
    page: z.number().int().min(1).default(1),
-   pageSize: z.number().int().min(1).max(100).default(10),
+   pageSize: z.number().int().min(1).max(5000).default(10),
    q: z.string().trim().optional(),
 });
 
@@ -35,7 +35,7 @@ export const routeGroupDeleteSchema = z.object({
 
 export const routeGroupListSchema = z.object({
    page: z.number().int().min(1).default(1),
-   pageSize: z.number().int().min(1).max(100).default(10),
+   pageSize: z.number().int().min(1).max(5000).default(10),
    q: z.string().trim().optional(),
 });
 
@@ -60,7 +60,7 @@ export const routeDeleteSchema = z.object({
 
 export const routeListSchema = z.object({
    page: z.number().int().min(1).default(1),
-   pageSize: z.number().int().min(1).max(100).default(10),
+   pageSize: z.number().int().min(1).max(5000).default(10),
    q: z.string().trim().optional(),
    groupId: z.string().optional(),
 });

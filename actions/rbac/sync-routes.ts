@@ -23,6 +23,7 @@ const EXCLUDED_ROUTES = [
    "/developer/api-tester",
    "/forgot",
    "/forgot/reset",
+   "/unauthorized",
    "/forgot/verify",
    "/login",
    "/register",
