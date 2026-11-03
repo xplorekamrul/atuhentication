@@ -540,7 +540,7 @@ export function DataTable<T>({
             </div>
           ) : null}
           
-          {pagination && (pagination.total > effectivePageSize || pagination.onPageSizeChange) && (
+          {pagination && (
             <div className="shrink-0 order-2 sm:order-2 ml-auto">
               <Pagination 
                 page={pagination.page}

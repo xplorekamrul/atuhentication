@@ -50,6 +50,7 @@ export default function RouteTable({
    const [q, setQ] = useState("");
    const [groupId, setGroupId] = useState("all");
    const [page, setPage] = useState(1);
+   const [pageSize, setPageSize] = useState(10);
    const [data, setData] = useState<RouteData>({ items: [], total: 0, page: 1, pageSize: 10 });
    const [editingRoute, setEditingRoute] = useState<RouteItem | null>(null);
    const [showDialog, setShowDialog] = useState(false);
@@ -58,39 +59,40 @@ export default function RouteTable({
    const { executeAsync: doList } = useAction(listRoutes);
 
    useEffect(() => {
-      fetchRoutes(1, q, groupId);
+      fetchRoutes(1, q, groupId, pageSize);
       // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
 
-   function fetchRoutes(targetPage = page, searchTerm = q, filterGroupId = groupId) {
+   function fetchRoutes(targetPage = page, searchTerm = q, filterGroupId = groupId, targetPageSize = pageSize) {
       startTransition(async () => {
          const result = await doList({
             page: targetPage,
-            pageSize: 10,
+            pageSize: targetPageSize,
             q: searchTerm.trim(),
             groupId: filterGroupId !== "all" ? filterGroupId : undefined,
          });
          if (result?.data?.ok) {
             setData(result.data);
             setPage(targetPage);
+            setPageSize(targetPageSize);
          }
       });
    }
 
    const handleSearchSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      fetchRoutes(1, q, groupId);
+      fetchRoutes(1, q, groupId, pageSize);
    };
 
    const handleGroupChange = (newGroupId: string) => {
       setGroupId(newGroupId);
-      fetchRoutes(1, q, newGroupId);
+      fetchRoutes(1, q, newGroupId, pageSize);
    };
 
    async function handleDelete(id: string) {
       const result = await doDelete({ id });
       if (result?.data?.ok) {
-         fetchRoutes(page, q, groupId);
+         fetchRoutes(page, q, groupId, pageSize);
       } else {
          alert(result?.data?.error || "Failed to delete route");
       }
@@ -109,7 +111,7 @@ export default function RouteTable({
    async function handleDialogClose(refreshed: boolean) {
       setShowDialog(false);
       if (refreshed) {
-         fetchRoutes(page, q, groupId);
+         fetchRoutes(page, q, groupId, pageSize);
       }
    }
 
@@ -217,7 +219,7 @@ export default function RouteTable({
          },
       ],
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [isPending, page, q, groupId]
+      [isPending, page, q, groupId, pageSize]
    );
 
    return (
@@ -279,8 +281,13 @@ export default function RouteTable({
             pagination={{
                page,
                total: data.total,
-               pageSize: data.pageSize,
-               onPageChange: (newPage) => fetchRoutes(newPage, q, groupId),
+               pageSize,
+               onPageChange: (newPage) => fetchRoutes(newPage, q, groupId, pageSize),
+               onPageSizeChange: (newPageSize) => {
+                  setPageSize(newPageSize);
+                  fetchRoutes(1, q, groupId, newPageSize);
+               },
+               pageSizeOptions: [10, 20, 50, 100],
             }}
          />
 

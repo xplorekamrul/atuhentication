@@ -26,7 +26,7 @@ export default function LoginHistoryTable({ history }: { history: LoginHistoryIt
    const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
    const [searchQuery, setSearchQuery] = useState("");
    const [page, setPage] = useState(1);
-   const pageSize = 10;
+   const [pageSize, setPageSize] = useState(10);
 
    const parsedHistory = useMemo((): ParsedHistoryItem[] => {
       return history.map((item) => {
@@ -230,6 +230,11 @@ export default function LoginHistoryTable({ history }: { history: LoginHistoryIt
                         total: filteredHistory.length,
                         pageSize,
                         onPageChange: (newPage) => setPage(newPage),
+                        onPageSizeChange: (newPageSize) => {
+                           setPageSize(newPageSize);
+                           setPage(1);
+                        },
+                        pageSizeOptions: [10, 20, 50, 100],
                      }}
                      className="rounded-t-none border-t-0"
                   />

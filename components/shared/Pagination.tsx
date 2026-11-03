@@ -1,13 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Check, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { CustomSelect, SelectOption } from "@/components/shared/custom-select";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface PageSizeSelectorProps {
@@ -25,45 +20,28 @@ export function PageSizeSelector({
   disabled = false,
   className = "",
 }: PageSizeSelectorProps) {
+  const selectOptions: SelectOption[] = options.map((opt) => ({
+    value: String(opt),
+    label: String(opt),
+  }));
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        disabled={disabled}
-        className={cn(
-          "inline-flex h-8 items-center justify-between gap-1.5 rounded-md border border-input bg-card px-2.5 text-xs font-medium text-foreground shadow-xs transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer select-none",
-          className
-        )}
-        aria-label="Rows per page"
-      >
-        <span>{pageSize}</span>
-        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        side="top"
-        sideOffset={6}
-        className="min-w-22 rounded-lg border border-border bg-popover p-1 shadow-lg z-50"
-      >
-        {options.map((opt) => {
-          const isSelected = opt === pageSize;
-          return (
-            <DropdownMenuItem
-              key={opt}
-              onClick={() => onPageSizeChange(opt)}
-              className={cn(
-                "flex items-center justify-between px-2.5 py-1.5 text-xs font-medium cursor-pointer rounded-md transition-colors",
-                isSelected
-                  ? "bg-primary/10 text-primary font-semibold"
-                  : "text-foreground hover:bg-muted"
-              )}
-            >
-              <span>{opt}</span>
-              {isSelected && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
-            </DropdownMenuItem>
-          );
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <CustomSelect
+      value={String(pageSize)}
+      onValueChange={(val) => onPageSizeChange(Number(val))}
+      options={selectOptions}
+      disabled={disabled}
+      searchable={false}
+      align="end"
+      className={cn(
+        "h-8 w-20 text-xs font-medium px-2 py-0 border-input bg-card",
+        className
+      )}
+      contentClassName="min-w-20 p-1"
+      optionRender={(opt) => (
+        <span className="text-xs font-medium">{opt.label}</span>
+      )}
+    />
   );
 }
 
@@ -178,7 +156,7 @@ export function Pagination({
                 size="sm"
                 onClick={() => onPageChange(page - 1)}
                 disabled={page === 1 || isLoading}
-                className="h-8 px-2 text-xs sm:text-sm"
+                className="h-8 px-2 text-xs sm:text-sm cursor-pointer"
               >
                 <ChevronLeft className="h-4 w-4" />
                 <span className="hidden xs:inline">Previous</span>
@@ -206,7 +184,7 @@ export function Pagination({
                         size="sm"
                         onClick={() => onPageChange(pageNum)}
                         disabled={isLoading}
-                        className={`w-8 h-8 p-0 text-xs sm:text-sm ${
+                        className={`w-8 h-8 p-0 text-xs sm:text-sm cursor-pointer ${
                           page === pageNum
                             ? "bg-primary text-primary-foreground"
                             : ""
@@ -224,7 +202,7 @@ export function Pagination({
                 size="sm"
                 onClick={() => onPageChange(page + 1)}
                 disabled={page >= totalPages || isLoading}
-                className="h-8 px-2 text-xs sm:text-sm"
+                className="h-8 px-2 text-xs sm:text-sm cursor-pointer"
               >
                 <span className="hidden xs:inline">Next</span>
                 <ChevronRight className="h-4 w-4" />

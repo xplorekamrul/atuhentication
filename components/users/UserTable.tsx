@@ -23,7 +23,7 @@ type UserStatusTab = "ALL" | "ACTIVE" | "INACTIVE" | "SUSPENDED";
 
 export default function UserTable() {
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
   const [users, setUsers] = useState<User[]>([]);
   const [total, setTotal] = useState(0);
   const [counts, setCounts] = useState({
@@ -42,7 +42,8 @@ export default function UserTable() {
   async function loadUsers(
     targetPage = page,
     statusTab = filterStatus,
-    query = searchQuery
+    query = searchQuery,
+    targetPageSize = pageSize
   ) {
     setIsLoading(true);
     try {
@@ -53,7 +54,7 @@ export default function UserTable() {
 
       const result = await doList({
         page: targetPage,
-        pageSize,
+        pageSize: targetPageSize,
         q: query || undefined,
         statuses,
       });
@@ -73,14 +74,14 @@ export default function UserTable() {
   }
 
   useEffect(() => {
-    loadUsers(page, filterStatus, searchQuery);
+    loadUsers(page, filterStatus, searchQuery, pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, filterStatus]);
+  }, [page, filterStatus, pageSize]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
-    loadUsers(1, filterStatus, searchQuery);
+    loadUsers(1, filterStatus, searchQuery, pageSize);
   };
 
   const getUserActionProps = (user: User) => {
@@ -185,14 +186,14 @@ export default function UserTable() {
           <div className="flex justify-end">
             <UserRowActions
               user={getUserActionProps(user)}
-              onChanged={() => loadUsers(page, filterStatus, searchQuery)}
+              onChanged={() => loadUsers(page, filterStatus, searchQuery, pageSize)}
             />
           </div>
         ),
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [page, filterStatus, searchQuery]
+    [page, filterStatus, searchQuery, pageSize]
   );
 
   return (
@@ -289,6 +290,12 @@ export default function UserTable() {
                   total,
                   pageSize,
                   onPageChange: (newPage) => setPage(newPage),
+                  onPageSizeChange: (newPageSize) => {
+                    setPageSize(newPageSize);
+                    setPage(1);
+                    loadUsers(1, filterStatus, searchQuery, newPageSize);
+                  },
+                  pageSizeOptions: [10, 20, 50, 100],
                 }}
                 className="rounded-t-none border-t-0"
               />
@@ -300,7 +307,7 @@ export default function UserTable() {
       <CreateUserDialog
         open={openCreate}
         onOpenChange={setOpenCreate}
-        onCreated={() => loadUsers(page, filterStatus, searchQuery)}
+        onCreated={() => loadUsers(page, filterStatus, searchQuery, pageSize)}
       />
     </div>
   );

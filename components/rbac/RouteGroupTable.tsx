@@ -39,6 +39,7 @@ export default function RouteGroupTable({
    const [isPending, startTransition] = useTransition();
    const [q, setQ] = useState("");
    const [page, setPage] = useState(1);
+   const [pageSize, setPageSize] = useState(10);
    const [data, setData] = useState<RouteGroupData>({ items: [], total: 0, page: 1, pageSize: 10 });
    const [editingGroup, setEditingGroup] = useState<RouteGroupItem | null>(null);
    const [showDialog, setShowDialog] = useState(false);
@@ -49,29 +50,30 @@ export default function RouteGroupTable({
    const { executeAsync: doList } = useAction(listRouteGroups);
 
    useEffect(() => {
-      fetchGroups(1, q);
+      fetchGroups(1, q, pageSize);
       // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
 
-   function fetchGroups(targetPage = page, searchTerm = q) {
+   function fetchGroups(targetPage = page, searchTerm = q, targetPageSize = pageSize) {
       startTransition(async () => {
-         const result = await doList({ page: targetPage, pageSize: 10, q: searchTerm.trim() });
+         const result = await doList({ page: targetPage, pageSize: targetPageSize, q: searchTerm.trim() });
          if (result?.data?.ok) {
             setData(result.data);
             setPage(targetPage);
+            setPageSize(targetPageSize);
          }
       });
    }
 
    const handleSearchSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      fetchGroups(1, q);
+      fetchGroups(1, q, pageSize);
    };
 
    async function handleDelete(id: string) {
       const result = await doDelete({ id });
       if (result?.data?.ok) {
-         fetchGroups(page, q);
+         fetchGroups(page, q, pageSize);
       } else {
          alert(result?.data?.error || "Failed to delete route group");
       }
@@ -90,7 +92,7 @@ export default function RouteGroupTable({
    async function handleDialogClose(refreshed: boolean) {
       setShowDialog(false);
       if (refreshed) {
-         fetchGroups(page, q);
+         fetchGroups(page, q, pageSize);
       }
    }
 
@@ -102,7 +104,7 @@ export default function RouteGroupTable({
    function handleAssignClose(refreshed: boolean) {
       setShowAssignDialog(false);
       if (refreshed) {
-         fetchGroups(page, q);
+         fetchGroups(page, q, pageSize);
       }
    }
 
@@ -190,7 +192,7 @@ export default function RouteGroupTable({
          },
       ],
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [isPending, page, q]
+      [isPending, page, q, pageSize]
    );
 
    return (
@@ -236,8 +238,13 @@ export default function RouteGroupTable({
             pagination={{
                page,
                total: data.total,
-               pageSize: data.pageSize,
-               onPageChange: (newPage) => fetchGroups(newPage, q),
+               pageSize,
+               onPageChange: (newPage) => fetchGroups(newPage, q, pageSize),
+               onPageSizeChange: (newPageSize) => {
+                  setPageSize(newPageSize);
+                  fetchGroups(1, q, newPageSize);
+               },
+               pageSizeOptions: [10, 20, 50, 100],
             }}
          />
 

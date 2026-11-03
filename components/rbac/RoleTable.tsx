@@ -34,6 +34,7 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
    const [isPending, startTransition] = useTransition();
    const [q, setQ] = useState("");
    const [page, setPage] = useState(1);
+   const [pageSize, setPageSize] = useState(10);
    const [data, setData] = useState<RoleData>({ items: [], total: 0, page: 1, pageSize: 10 });
    const [editingRole, setEditingRole] = useState<RoleItem | null>(null);
    const [showDialog, setShowDialog] = useState(false);
@@ -46,29 +47,30 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
    const { executeAsync: doList } = useAction(listRoles);
 
    useEffect(() => {
-      fetchRoles(1, q);
+      fetchRoles(1, q, pageSize);
       // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
 
-   function fetchRoles(targetPage = page, searchTerm = q) {
+   function fetchRoles(targetPage = page, searchTerm = q, targetPageSize = pageSize) {
       startTransition(async () => {
-         const result = await doList({ page: targetPage, pageSize: 10, q: searchTerm.trim() });
+         const result = await doList({ page: targetPage, pageSize: targetPageSize, q: searchTerm.trim() });
          if (result?.data?.ok) {
             setData(result.data);
             setPage(targetPage);
+            setPageSize(targetPageSize);
          }
       });
    }
 
    const handleSearchSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      fetchRoles(1, q);
+      fetchRoles(1, q, pageSize);
    };
 
    async function handleDelete(id: string) {
       const result = await doDelete({ id });
       if (result?.data?.ok) {
-         fetchRoles(page, q);
+         fetchRoles(page, q, pageSize);
       } else {
          alert(result?.data?.error || "Failed to delete role");
       }
@@ -87,7 +89,7 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
    async function handleDialogClose(refreshed: boolean) {
       setShowDialog(false);
       if (refreshed) {
-         fetchRoles(page, q);
+         fetchRoles(page, q, pageSize);
       }
    }
 
@@ -99,7 +101,7 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
    async function handleAssignClose(refreshed: boolean) {
       setShowAssignDialog(false);
       if (refreshed) {
-         fetchRoles(page, q);
+         fetchRoles(page, q, pageSize);
       }
    }
 
@@ -111,7 +113,7 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
    async function handleAssignUsersClose(refreshed: boolean) {
       setShowAssignUsersDialog(false);
       if (refreshed) {
-         fetchRoles(page, q);
+         fetchRoles(page, q, pageSize);
       }
    }
 
@@ -209,7 +211,7 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
          },
       ],
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [isPending, page, q]
+      [isPending, page, q, pageSize]
    );
 
    return (
@@ -255,8 +257,13 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
             pagination={{
                page,
                total: data.total,
-               pageSize: data.pageSize,
-               onPageChange: (newPage) => fetchRoles(newPage, q),
+               pageSize,
+               onPageChange: (newPage) => fetchRoles(newPage, q, pageSize),
+               onPageSizeChange: (newPageSize) => {
+                  setPageSize(newPageSize);
+                  fetchRoles(1, q, newPageSize);
+               },
+               pageSizeOptions: [10, 20, 50, 100],
             }}
          />
 
