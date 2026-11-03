@@ -259,17 +259,20 @@ export default function RouteTable({
                      ))}
                   </SelectContent>
                </Select>
-               <SyncRoutesButton onSyncComplete={() => fetchRoutes(1, q, groupId, pageSize)} />
+
 
             </div>
+            <div className="flex gap-x-2">
+               <SyncRoutesButton onSyncComplete={() => fetchRoutes(1, q, groupId, pageSize)} />
+               <button
+                  onClick={handleCreate}
+                  disabled={isPending}
+                  className="inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 bg-primary text-primary-foreground hover:opacity-90 transition-opacity text-sm font-medium shadow-sm cursor-pointer disabled:opacity-50"
+               >
+                  <Plus className="h-4 w-4" /> Add Route
+               </button>
+            </div>
 
-            <button
-               onClick={handleCreate}
-               disabled={isPending}
-               className="inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 bg-primary text-primary-foreground hover:opacity-90 transition-opacity text-sm font-medium shadow-sm cursor-pointer disabled:opacity-50"
-            >
-               <Plus className="h-4 w-4" /> Add Route
-            </button>
          </div>
 
          <DataTable<RouteItem>
