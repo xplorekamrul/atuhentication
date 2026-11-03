@@ -15,6 +15,7 @@ import { useEffect, useState, useTransition, useMemo } from "react";
 import RouteDialog from "./RouteDialog";
 import { DataTable, ColumnDef } from "@/components/shared/data-table";
 import { DeleteConfirmDialog } from "@/components/shared/DeleteConfirmDialog";
+import { SyncRoutesButton } from "./SyncRoutesButton";
 
 type RouteItem = {
    id: string | bigint;
@@ -179,15 +180,15 @@ export default function RouteTable({
                      typeof route.createdAt === "string"
                         ? new Date(route.createdAt)
                         : route.createdAt instanceof Date
-                        ? route.createdAt
-                        : new Date(route.createdAt);
+                           ? route.createdAt
+                           : new Date(route.createdAt);
                   return isNaN(date.getTime())
                      ? "—"
                      : date.toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                       });
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                     });
                } catch {
                   return "—";
                }
@@ -258,6 +259,8 @@ export default function RouteTable({
                      ))}
                   </SelectContent>
                </Select>
+               <SyncRoutesButton onSyncComplete={() => fetchRoutes(1, q, groupId, pageSize)} />
+
             </div>
 
             <button

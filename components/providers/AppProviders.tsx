@@ -3,6 +3,7 @@
 import { SessionProvider } from "next-auth/react";
 import { useEffect } from "react";
 import { ThemeProvider } from "next-themes";
+import { Toaster } from "sonner";
 import GoogleOneTap from "../auth/GoogleOneTap";
 
 export default function AppProviders({ children }: { children: React.ReactNode }) {
@@ -27,6 +28,7 @@ export default function AppProviders({ children }: { children: React.ReactNode }
       >
         <GoogleOneTap />
         {children}
+        <Toaster richColors position="top-right" />
       </ThemeProvider>
     </SessionProvider>
   );

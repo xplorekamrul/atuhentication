@@ -1,11 +1,13 @@
+import { listRoles } from "@/actions/rbac/roles";
 import { listRouteGroups } from "@/actions/rbac/route-groups";
 import { listRoutes } from "@/actions/rbac/routes";
 import RoleTable from "@/components/rbac/RoleTable";
 import RouteGroupTable from "@/components/rbac/RouteGroupTable";
 import RouteTable from "@/components/rbac/RouteTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 import { Suspense } from "react";
+
 
 export const metadata = {
    title: "RBAC Management",
@@ -33,13 +35,22 @@ async function getAllRoutes() {
 
 async function getRoleCount() {
    try {
-      return await prisma.role.count();
+      const result = await listRoles({ page: 1, pageSize: 1 });
+      if (result?.data?.ok) {
+         return result.data.total;
+      }
+      return 0;
    } catch {
       return 0;
    }
 }
 
-export default function RBACPage() {
+export default async function RBACPage() {
+   const session = await auth();
+   if (!session?.user) {
+      return <div className="p-6">Unauthorized</div>;
+   }
+
    return (
       <div className="space-y-6 p-4 sm:p-6">
          <div>
