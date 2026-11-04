@@ -6,6 +6,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import FacebookProvider from "next-auth/providers/facebook";
 import "server-only";
+import { headers } from "next/headers";
 import { prisma } from "./prisma";
 import { recordLoginHistory } from "./login-history";
 import {
@@ -16,6 +17,19 @@ import {
   recordSpamWhileLocked,
   resetExponentialLockout,
 } from "./rate-limit";
+
+function safeParseBigInt(val: unknown): bigint | null {
+  if (typeof val === "bigint") return val;
+  if (typeof val === "number" && Number.isInteger(val)) return BigInt(val);
+  if (typeof val === "string" && /^\d+$/.test(val.trim())) {
+    try {
+      return BigInt(val.trim());
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
@@ -249,6 +263,22 @@ export const authOptions: NextAuthOptions = {
           user.level = admin.level as "ADMIN" | "SUPER_ADMIN" | "DEVELOPER";
           user.status = admin.status as "ACTIVE" | "INACTIVE" | "SUSPENDED";
           user.sessionVersion = admin.sessionVersion;
+
+          // Record OAuth login history for admin
+          try {
+            const headerList = await headers();
+            const ip = getClientIp(headerList);
+            const ua = headerList.get("user-agent") || "Unknown User Agent";
+            await recordLoginHistory({
+              adminId: admin.id,
+              ipAddress: ip,
+              userAgent: ua,
+              maxKeep: 20,
+            });
+          } catch (error) {
+            console.error("Failed to record admin OAuth login history:", error);
+          }
+
           return true;
         }
 
@@ -258,14 +288,17 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!existingUser) {
-          // Generate unique username from name or email
+          // Generate unique username from name or email (checks BOTH User and Admin tables)
           const baseUsername = (user.name ?? email.split("@")[0])
             .toLowerCase()
             .replace(/[^a-z0-9]/g, "")
             .slice(0, 30) || "user";
           let username = baseUsername;
           let counter = 1;
-          while (await prisma.user.findUnique({ where: { username } })) {
+          while (
+            (await prisma.user.findUnique({ where: { username }, select: { id: true } })) ||
+            (await prisma.admin.findUnique({ where: { username }, select: { id: true } }))
+          ) {
             username = `${baseUsername}${counter++}`;
           }
 
@@ -321,6 +354,21 @@ export const authOptions: NextAuthOptions = {
           });
         }
 
+        // Record OAuth login history for user
+        try {
+          const headerList = await headers();
+          const ip = getClientIp(headerList);
+          const ua = headerList.get("user-agent") || "Unknown User Agent";
+          await recordLoginHistory({
+            userId: existingUser.id,
+            ipAddress: ip,
+            userAgent: ua,
+            maxKeep: 20,
+          });
+        } catch (error) {
+          console.error("Failed to record user OAuth login history:", error);
+        }
+
         // Set user fields so jwt callback reads them on first-time login
         user.id = existingUser.id.toString();
         user.userType = "USER";
@@ -349,9 +397,12 @@ export const authOptions: NextAuthOptions = {
 
       // Subsequent requests: validate sessionVersion and status against DB
       if (token.id) {
+        const parsedId = safeParseBigInt(token.id);
+        if (!parsedId) return null as any;
+
         if (token.userType === "ADMIN") {
           const admin = await prisma.admin.findUnique({
-            where: { id: BigInt(token.id) },
+            where: { id: parsedId },
             select: { id: true, level: true, status: true, name: true, image: true, sessionVersion: true },
           });
 
@@ -371,7 +422,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         const dbUser = await prisma.user.findUnique({
-          where: { id: BigInt(token.id) },
+          where: { id: parsedId },
           select: { id: true, status: true, name: true, image: true, sessionVersion: true },
         });
 

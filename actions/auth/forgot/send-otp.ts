@@ -39,6 +39,12 @@ export const sendResetOtp = actionClient
     const admin = !user ? await prisma.admin.findUnique({ where: { email }, select: { id: true } }) : null;
 
     if (user || admin) {
+      // Invalidate any previously unconsumed OTPs for this email so only the latest is active
+      await prisma.passwordResetOtp.updateMany({
+        where: { email, consumedAt: null },
+        data: { consumedAt: new Date() },
+      });
+
       const otp = generateOtp(6);
       const codeHash = await hashOtp(otp);
       const ttlMin = Number(process.env.RESET_TOKEN_TTL_MIN ?? 15);
@@ -48,7 +54,16 @@ export const sendResetOtp = actionClient
         data: { email, codeHash, expiresAt },
       });
 
-      await sendOtpMail(email, otp);
+      // Safely send mail with error handling
+      try {
+        await sendOtpMail(email, otp);
+      } catch (mailError) {
+        console.error("Failed to send OTP email:", mailError);
+        return {
+          ok: false as const,
+          message: "Failed to dispatch reset code email. Please try again later.",
+        };
+      }
     }
 
     // Return generic success to avoid email enumeration

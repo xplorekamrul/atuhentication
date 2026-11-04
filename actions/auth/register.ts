@@ -28,24 +28,27 @@ export const register = actionClient
       };
     }
 
+    // 2. Cross-table collision check (guarantee email and username are unique across BOTH Admin and User tables)
+    const [adminWithEmail, userWithEmail, adminWithUsername, userWithUsername] = await Promise.all([
+      prisma.admin.findUnique({ where: { email: normalizedEmail }, select: { id: true } }),
+      prisma.user.findUnique({ where: { email: normalizedEmail }, select: { id: true } }),
+      prisma.admin.findUnique({ where: { username }, select: { id: true } }),
+      prisma.user.findUnique({ where: { username }, select: { id: true } }),
+    ]);
+
+    if (adminWithEmail || userWithEmail || adminWithUsername || userWithUsername) {
+      return { ok: false as const, message: ACCOUNT_EXISTS_MESSAGE };
+    }
+
     // Check if email matches admin emails
     const superAdminEmail = (process.env.SUPERADMIN_EMAIL ?? "").toLowerCase().trim();
     const developerEmail = (process.env.DEVELOPER_EMAIL ?? "").toLowerCase().trim();
 
     const isAdmin = normalizedEmail === superAdminEmail || normalizedEmail === developerEmail;
 
+    const pwd = await hashPassword(password);
+
     if (isAdmin) {
-      // Register as Admin
-      const emailExists = await prisma.admin.findUnique({ where: { email: normalizedEmail } });
-      if (emailExists) {
-        return { ok: false as const, message: ACCOUNT_EXISTS_MESSAGE };
-      }
-
-      const usernameExists = await prisma.admin.findUnique({ where: { username } });
-      if (usernameExists) {
-        return { ok: false as const, message: ACCOUNT_EXISTS_MESSAGE };
-      }
-
       // Determine admin level based on email
       let level: AdminLevel = AdminLevel.ADMIN;
       if (normalizedEmail === superAdminEmail) {
@@ -53,8 +56,6 @@ export const register = actionClient
       } else if (normalizedEmail === developerEmail) {
         level = AdminLevel.DEVELOPER;
       }
-
-      const pwd = await hashPassword(password);
 
       const admin = await prisma.admin.create({
         data: {
@@ -75,19 +76,6 @@ export const register = actionClient
 
       return { ok: true as const, user: admin };
     } else {
-      // Register as User
-      const emailExists = await prisma.user.findUnique({ where: { email: normalizedEmail } });
-      if (emailExists) {
-        return { ok: false as const, message: ACCOUNT_EXISTS_MESSAGE };
-      }
-
-      const usernameExists = await prisma.user.findUnique({ where: { username } });
-      if (usernameExists) {
-        return { ok: false as const, message: ACCOUNT_EXISTS_MESSAGE };
-      }
-
-      const pwd = await hashPassword(password);
-
       const user = await prisma.user.create({
         data: {
           name,

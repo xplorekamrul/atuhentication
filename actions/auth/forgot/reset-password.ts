@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/hash";
 import { cookies } from "next/headers";
 import { verifyResetToken } from "@/lib/reset-token";
+import { resetExponentialLockout } from "@/lib/rate-limit";
 
 export const resetPassword = actionClient
   .schema(resetPasswordSchema)
@@ -33,6 +34,8 @@ export const resetPassword = actionClient
         },
       });
 
+      // Clear any lockout on the account so the user can immediately log in
+      resetExponentialLockout(`exp:account:${email}`);
       cookieStore.delete("reset_token");
       return { ok: true as const };
     }
@@ -48,6 +51,8 @@ export const resetPassword = actionClient
         },
       });
 
+      // Clear any lockout on the admin account so the admin can immediately log in
+      resetExponentialLockout(`exp:account:${email}`);
       cookieStore.delete("reset_token");
       return { ok: true as const };
     }
