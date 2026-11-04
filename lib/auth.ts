@@ -131,8 +131,8 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
-          // Block suspended admin
-          if (admin.status === "SUSPENDED") return null;
+          // Block suspended or inactive admin
+          if (admin.status !== "ACTIVE") return null;
 
           // Successful login: reset account failed attempts
           resetExponentialLockout(accountLockKey);
@@ -187,8 +187,8 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        // Block suspended user
-        if (user.status === "SUSPENDED") return null;
+        // Block suspended or inactive user
+        if (user.status !== "ACTIVE") return null;
 
         const ok = await bcrypt.compare(password, user.password);
         if (!ok) {
@@ -256,7 +256,7 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (admin) {
-          if (admin.status === "SUSPENDED") return false;
+          if (admin.status !== "ACTIVE") return false;
 
           user.id = admin.id.toString();
           user.userType = "ADMIN";
@@ -314,8 +314,8 @@ export const authOptions: NextAuthOptions = {
             },
           });
         } else {
-          // Prevent suspended users from signing in
-          if (existingUser.status === "SUSPENDED") return false;
+          // Prevent suspended or inactive users from signing in
+          if (existingUser.status !== "ACTIVE") return false;
 
           // Sync avatar if missing
           if (!existingUser.image && user.image) {
@@ -381,7 +381,7 @@ export const authOptions: NextAuthOptions = {
 
     /**
      * jwt callback: validates sessionVersion and refreshes user metadata on every request.
-     * When sessionVersion mismatches or user is suspended, returning null invalidates the JWT.
+     * When sessionVersion mismatches or user is suspended/inactive, returning null invalidates the JWT.
      */
     async jwt({ token, user }: { token: JWT; user?: User }) {
       if (user) {
@@ -406,8 +406,8 @@ export const authOptions: NextAuthOptions = {
             select: { id: true, level: true, status: true, name: true, image: true, sessionVersion: true },
           });
 
-          // Admin deleted or suspended
-          if (!admin || admin.status === "SUSPENDED") return null as any;
+          // Admin deleted, suspended, or inactive
+          if (!admin || admin.status !== "ACTIVE") return null as any;
 
           // Session version mismatch -> force logout all active sessions
           if (token.sessionVersion !== admin.sessionVersion) return null as any;
@@ -426,8 +426,8 @@ export const authOptions: NextAuthOptions = {
           select: { id: true, status: true, name: true, image: true, sessionVersion: true },
         });
 
-        // User deleted or suspended
-        if (!dbUser || dbUser.status === "SUSPENDED") return null as any;
+        // User deleted, suspended, or inactive
+        if (!dbUser || dbUser.status !== "ACTIVE") return null as any;
 
         // Session version mismatch -> force logout all active sessions
         if (token.sessionVersion !== dbUser.sessionVersion) return null as any;

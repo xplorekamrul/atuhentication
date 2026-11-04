@@ -7,46 +7,85 @@ import { $Enums, Prisma } from "@prisma/client";
 
 export const updateUserStatus = superAdminActionClient
   .schema(updateUserStatusSchema)
-  .action(async ({ parsedInput, ctx }) => {
+  .action(async ({ parsedInput }) => {
     const { id, status } = parsedInput;
 
-    //Fetch target first
-    const target = await prisma.admin.findUnique({
+    const isDeactivated = status === "SUSPENDED" || status === "INACTIVE";
+
+    // 1. Try finding target in Admin table
+    const targetAdmin = await prisma.admin.findUnique({
       where: { id },
       select: { id: true, level: true, email: true, name: true },
     });
 
-    if (!target) {
-      return { ok: false as const, message: "Admin not found." };
+    if (targetAdmin) {
+      // Do not allow modifying Developer admins
+      if (targetAdmin.level === $Enums.AdminLevel.DEVELOPER) {
+        return {
+          ok: false as const,
+          message: "Developer admins are protected and cannot be modified.",
+        };
+      }
+
+      const data: Prisma.AdminUpdateInput = isDeactivated
+        ? {
+            status: status as $Enums.AccountStatus,
+            suspendedAt: status === "SUSPENDED" ? new Date() : null,
+            sessionVersion: { increment: 1 },
+          }
+        : {
+            status: status as $Enums.AccountStatus,
+            suspendedAt: null,
+          };
+
+      const admin = await prisma.admin.update({
+        where: { id },
+        data,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          level: true,
+          status: true,
+          suspendedAt: true,
+        },
+      });
+
+      return { ok: true as const, user: admin };
     }
 
-    //   do not allow modifying Developer admins
-    if (target.level === $Enums.AdminLevel.DEVELOPER) {
-      return {
-        ok: false as const,
-        message: "Developer admins are protected and cannot be modified.",
-      };
-    }
-
-
-
-    const data: Prisma.AdminUpdateInput =
-      status === "SUSPENDED"
-        ? { status: status as $Enums.AccountStatus, suspendedAt: new Date(), sessionVersion: { increment: 1 } }
-        : { status: status as $Enums.AccountStatus, suspendedAt: null };
-
-    const admin = await prisma.admin.update({
+    // 2. Try finding target in User table
+    const targetUser = await prisma.user.findUnique({
       where: { id },
-      data,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        level: true,
-        status: true,
-        suspendedAt: true,
-      },
+      select: { id: true, email: true, name: true },
     });
 
-    return { ok: true as const, user: admin };
+    if (targetUser) {
+      const data: Prisma.UserUpdateInput = isDeactivated
+        ? {
+            status: status as $Enums.AccountStatus,
+            suspendedAt: status === "SUSPENDED" ? new Date() : null,
+            sessionVersion: { increment: 1 },
+          }
+        : {
+            status: status as $Enums.AccountStatus,
+            suspendedAt: null,
+          };
+
+      const user = await prisma.user.update({
+        where: { id },
+        data,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          status: true,
+          suspendedAt: true,
+        },
+      });
+
+      return { ok: true as const, user };
+    }
+
+    return { ok: false as const, message: "Account not found." };
   });
