@@ -9,9 +9,52 @@ import { $Enums } from "@prisma/client";
 export const deleteUser = superAdminActionClient
   .schema(deleteUserSchema)
   .action(async ({ parsedInput }) => {
-    const { id } = parsedInput;
+    const { id, userType } = parsedInput;
 
-    // 1. Try finding target in Admin table
+    // 1. If explicitly USER
+    if (userType === "USER") {
+      const targetUser = await prisma.user.findUnique({
+        where: { id },
+        select: { id: true, email: true },
+      });
+
+      if (!targetUser) return { ok: false as const, message: "User not found." };
+
+      await prisma.user.delete({ where: { id } });
+
+      if (targetUser.email) {
+        resetExponentialLockout(`exp:account:${targetUser.email.toLowerCase().trim()}`);
+      }
+
+      return { ok: true as const };
+    }
+
+    // 2. If explicitly ADMIN
+    if (userType === "ADMIN") {
+      const targetAdmin = await prisma.admin.findUnique({
+        where: { id },
+        select: { id: true, level: true, email: true },
+      });
+
+      if (!targetAdmin) return { ok: false as const, message: "Admin not found." };
+
+      if (targetAdmin.level === $Enums.AdminLevel.DEVELOPER) {
+        return {
+          ok: false as const,
+          message: "Developer admins are protected and cannot be deleted.",
+        };
+      }
+
+      await prisma.admin.delete({ where: { id } });
+
+      if (targetAdmin.email) {
+        resetExponentialLockout(`exp:account:${targetAdmin.email.toLowerCase().trim()}`);
+      }
+
+      return { ok: true as const };
+    }
+
+    // 3. Fallback: check Admin first, then User
     const targetAdmin = await prisma.admin.findUnique({
       where: { id },
       select: { id: true, level: true, email: true },
@@ -34,7 +77,6 @@ export const deleteUser = superAdminActionClient
       return { ok: true as const };
     }
 
-    // 2. Try finding target in User table
     const targetUser = await prisma.user.findUnique({
       where: { id },
       select: { id: true, email: true },

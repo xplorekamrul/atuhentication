@@ -8,18 +8,53 @@ import { $Enums, Prisma } from "@prisma/client";
 export const updateUserStatus = superAdminActionClient
   .schema(updateUserStatusSchema)
   .action(async ({ parsedInput }) => {
-    const { id, status } = parsedInput;
-
+    const { id, userType, status } = parsedInput;
     const isDeactivated = status === "SUSPENDED" || status === "INACTIVE";
 
-    // 1. Try finding target in Admin table
-    const targetAdmin = await prisma.admin.findUnique({
-      where: { id },
-      select: { id: true, level: true, email: true, name: true },
-    });
+    // 1. If explicitly USER
+    if (userType === "USER") {
+      const targetUser = await prisma.user.findUnique({
+        where: { id },
+        select: { id: true, email: true, name: true },
+      });
 
-    if (targetAdmin) {
-      // Do not allow modifying Developer admins
+      if (!targetUser) return { ok: false as const, message: "User not found." };
+
+      const data: Prisma.UserUpdateInput = isDeactivated
+        ? {
+            status: status as $Enums.AccountStatus,
+            suspendedAt: status === "SUSPENDED" ? new Date() : null,
+            sessionVersion: { increment: 1 },
+          }
+        : {
+            status: status as $Enums.AccountStatus,
+            suspendedAt: null,
+          };
+
+      const user = await prisma.user.update({
+        where: { id },
+        data,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          status: true,
+          suspendedAt: true,
+        },
+      });
+
+      return { ok: true as const, user };
+    }
+
+    // 2. If explicitly ADMIN
+    if (userType === "ADMIN") {
+      const targetAdmin = await prisma.admin.findUnique({
+        where: { id },
+        select: { id: true, level: true, email: true, name: true },
+      });
+
+      if (!targetAdmin) return { ok: false as const, message: "Admin not found." };
+
       if (targetAdmin.level === $Enums.AdminLevel.DEVELOPER) {
         return {
           ok: false as const,
@@ -54,7 +89,47 @@ export const updateUserStatus = superAdminActionClient
       return { ok: true as const, user: admin };
     }
 
-    // 2. Try finding target in User table
+    // 3. Fallback if userType not provided: check Admin first, then User
+    const targetAdmin = await prisma.admin.findUnique({
+      where: { id },
+      select: { id: true, level: true, email: true, name: true },
+    });
+
+    if (targetAdmin) {
+      if (targetAdmin.level === $Enums.AdminLevel.DEVELOPER) {
+        return {
+          ok: false as const,
+          message: "Developer admins are protected and cannot be modified.",
+        };
+      }
+
+      const data: Prisma.AdminUpdateInput = isDeactivated
+        ? {
+            status: status as $Enums.AccountStatus,
+            suspendedAt: status === "SUSPENDED" ? new Date() : null,
+            sessionVersion: { increment: 1 },
+          }
+        : {
+            status: status as $Enums.AccountStatus,
+            suspendedAt: null,
+          };
+
+      const admin = await prisma.admin.update({
+        where: { id },
+        data,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          level: true,
+          status: true,
+          suspendedAt: true,
+        },
+      });
+
+      return { ok: true as const, user: admin };
+    }
+
     const targetUser = await prisma.user.findUnique({
       where: { id },
       select: { id: true, email: true, name: true },

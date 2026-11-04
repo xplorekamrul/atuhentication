@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  user: { id: string; name: string | null; email: string };
+  user: { id: string; name: string | null; email: string; userType?: "ADMIN" | "USER" };
   onSaved: () => void;
 };
 
@@ -24,7 +24,7 @@ export default function EditInfoDialog({ open, onOpenChange, user, onSaved }: Pr
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const res = await executeAsync({ id: user.id, name, email });
+    const res = await executeAsync({ id: user.id, userType: user.userType, name, email });
     if (res?.data?.ok) {
       onSaved();
       onOpenChange(false);
@@ -60,16 +60,20 @@ export default function EditInfoDialog({ open, onOpenChange, user, onSaved }: Pr
           </div>
         </div>
 
-        {result?.data && !result.data.ok ? (
-          <p className="mt-2 text-sm text-destructive">{result.data.message ?? "Update failed"}</p>
-        ) : null}
-
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={() => onOpenChange(false)} className="px-3 py-2 rounded-md border cursor-pointer">
+          <button
+            type="button"
+            className="rounded-md border border-border px-3 py-2 text-sm"
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </button>
-          <button disabled={status === "executing"} className="px-3 py-2 rounded-md bg-primary text-white cursor-pointer">
-            Save
+          <button
+            type="submit"
+            disabled={status === "executing"}
+            className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
+          >
+            {status === "executing" ? "Saving..." : "Save"}
           </button>
         </div>
       </form>

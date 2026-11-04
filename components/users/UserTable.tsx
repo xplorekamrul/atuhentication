@@ -91,6 +91,7 @@ export default function UserTable() {
       name: user.name,
       email: user.email || "",
       role: (user.role || "ADMIN") as "DEVELOPER" | "SUPER_ADMIN" | "ADMIN",
+      userType: user.userType as "ADMIN" | "USER",
       status: user.status as "ACTIVE" | "INACTIVE" | "SUSPENDED",
     };
   };

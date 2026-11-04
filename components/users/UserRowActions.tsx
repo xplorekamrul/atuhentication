@@ -4,7 +4,7 @@ import { useState, useMemo, type ReactNode } from "react";
 import { useAction } from "next-safe-action/hooks";
 import { updateUserStatus } from "@/actions/users/update-user-status";
 import { deleteUser } from "@/actions/users/delete-user";
-import { Pencil, KeyRound, MoreHorizontal, PlayCircle, PauseCircle, UserX, Lock } from "lucide-react";
+import { Pencil, KeyRound, PlayCircle, PauseCircle, UserX, MoreHorizontal } from "lucide-react";
 import EditInfoDialog from "./dialogs/EditInfoDialog";
 import EditPasswordDialog from "./dialogs/EditPasswordDialog";
 import { DeleteConfirmDialog } from "@/components/shared/DeleteConfirmDialog";
@@ -19,6 +19,7 @@ type Props = {
     name: string | null;
     email: string;
     role: Role;
+    userType?: "ADMIN" | "USER";
     status: Status;
   };
   onChanged: () => void;
@@ -38,15 +39,15 @@ export default function UserRowActions({ user, onChanged, disabled: disabledProp
   async function setStatus(status: Status) {
     if (disabled) return;
     setOpenMenu(false);
-    const res = await doStatus({ id: user.id, status });
+    const res = await doStatus({ id: user.id, userType: user.userType, status });
     if (res?.data?.ok) onChanged();
   }
 
   const statusOptions = useMemo((): { key: Status; label: string; icon: ReactNode; className: string }[] => {
     const all = [
-      { key: "ACTIVE" as const,   label: "Activate",   icon: <PlayCircle className="h-4 w-4" />,  className: "text-emerald-600" },
+      { key: "ACTIVE" as const, label: "Activate", icon: <PlayCircle className="h-4 w-4" />, className: "text-emerald-600" },
       { key: "INACTIVE" as const, label: "Inactivate", icon: <PauseCircle className="h-4 w-4" />, className: "text-orange-600" },
-      { key: "SUSPENDED" as const,label: "Suspend",    icon: <UserX className="h-4 w-4" />,       className: "text-amber-700" },
+      { key: "SUSPENDED" as const, label: "Suspend", icon: <UserX className="h-4 w-4" />, className: "text-amber-700" },
     ];
     return all.filter(o => o.key !== user.status);
   }, [user.status]);
@@ -58,9 +59,8 @@ export default function UserRowActions({ user, onChanged, disabled: disabledProp
         aria-label="Actions disabled"
         className="h-8 w-8 grid place-items-center rounded-md border border-border opacity-50 cursor-not-allowed"
         disabled
-        title="Actions are disabled for Developer users"
       >
-        <Lock className="h-4 w-4" />
+        <MoreHorizontal className="h-4 w-4" />
       </button>
     );
   }
@@ -71,16 +71,20 @@ export default function UserRowActions({ user, onChanged, disabled: disabledProp
         <PopoverTrigger asChild>
           <button
             type="button"
-            aria-label="Actions"
-            className="h-8 w-8 grid place-items-center rounded-md border border-border cursor-pointer hover:bg-muted transition-colors"
-            title="Actions"
+            className="h-8 w-8 grid place-items-center rounded-md border border-border hover:bg-muted text-foreground cursor-pointer transition-colors"
+            aria-label="User actions"
           >
-            <MoreHorizontal className="h-4 w-4 text-center" />
+            <MoreHorizontal className="h-4 w-4" />
           </button>
         </PopoverTrigger>
 
-        <PopoverContent align="end" className="w-48 p-1 z-50">
-          {statusOptions.map((opt) => (
+        <PopoverContent
+          align="end"
+          sideOffset={4}
+          className="w-48 p-1 text-sm bg-popover text-popover-foreground border border-border rounded-lg shadow-lg"
+        >
+          {/* Status Sub-options */}
+          {statusOptions.map(opt => (
             <button
               key={opt.key}
               type="button"
@@ -91,9 +95,11 @@ export default function UserRowActions({ user, onChanged, disabled: disabledProp
             </button>
           ))}
 
+          <div className="h-px bg-border my-1" />
+
           <button
             type="button"
-            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted rounded-md text-emerald-600 cursor-pointer text-sm"
+            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted rounded-md text-foreground cursor-pointer text-sm"
             onClick={() => {
               setOpenMenu(false);
               setOpenInfo(true);
@@ -121,7 +127,7 @@ export default function UserRowActions({ user, onChanged, disabled: disabledProp
               title="Delete User"
               description={`Are you sure you want to delete user "${user.name || user.email}"? This action cannot be undone.`}
               onConfirm={async () => {
-                const res = await doDelete({ id: user.id });
+                const res = await doDelete({ id: user.id, userType: user.userType });
                 if (res?.data?.ok) onChanged();
               }}
             >
@@ -133,7 +139,7 @@ export default function UserRowActions({ user, onChanged, disabled: disabledProp
 
       {/* Dialogs */}
       <EditInfoDialog open={openInfo} onOpenChange={setOpenInfo} user={user} onSaved={onChanged} />
-      <EditPasswordDialog open={openPass} onOpenChange={setOpenPass} userId={user.id} onSaved={onChanged} />
+      <EditPasswordDialog open={openPass} onOpenChange={setOpenPass} userId={user.id} userType={user.userType} onSaved={onChanged} />
     </>
   );
 }

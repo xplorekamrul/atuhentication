@@ -4,108 +4,161 @@ import { auth } from "@/lib/auth";
 import { hashPassword, verifyPassword } from "@/lib/hash";
 import { prisma } from "@/lib/prisma";
 import { actionClient } from "@/lib/safe-action/clients";
+import { resetExponentialLockout } from "@/lib/rate-limit";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 const updateProfileSchema = z.object({
-   name: z.string().min(1, "Name is required"),
-   email: z.string().email("Invalid email"),
-   username: z.string().min(1, "Username is required"),
-   image: z.string().nullable().optional(),
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Invalid email"),
+  username: z.string().min(1, "Username is required"),
+  image: z.string().nullable().optional(),
 });
 
-const changePasswordSchema = z.object({
-   oldPassword: z.string().min(1, "Current password is required"),
-   newPassword: z.string().min(8, "Password must be at least 8 characters"),
-   confirmPassword: z.string().min(1, "Confirm password is required"),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-   message: "Passwords don't match",
-   path: ["confirmPassword"],
-});
+const changePasswordSchema = z
+  .object({
+    oldPassword: z.string().min(1, "Current password is required"),
+    newPassword: z.string().min(8, "Password must be at least 8 characters"),
+    confirmPassword: z.string().min(1, "Confirm password is required"),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
 
 export const updateProfile = actionClient
-   .schema(updateProfileSchema)
-   .action(async ({ parsedInput }) => {
-      const session = await auth();
-      if (!session?.user?.id) {
-         return { ok: false as const, message: "Unauthorized" };
-      }
+  .schema(updateProfileSchema)
+  .action(async ({ parsedInput }) => {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { ok: false as const, message: "Unauthorized" };
+    }
 
-      const userId = BigInt(session.user.id);
+    const userType = session.user.userType;
+    const userId = BigInt(session.user.id);
+    const { name, email, username, image } = parsedInput;
+    const normalizedEmail = email.toLowerCase().trim();
 
-      // Check if email or username already exists for another user
-      const existingUser = await prisma.user.findFirst({
-         where: {
-            AND: [
-               { id: { not: userId } },
-               {
-                  OR: [
-                     { email: parsedInput.email },
-                     { username: parsedInput.username },
-                  ],
-               },
-            ],
-         },
+    // Check collision across BOTH Admin and User tables for other accounts
+    const [adminCollision, userCollision] = await Promise.all([
+      prisma.admin.findFirst({
+        where: {
+          OR: [{ email: normalizedEmail }, { username }],
+          NOT: userType === "ADMIN" ? { id: userId } : undefined,
+        },
+        select: { id: true },
+      }),
+      prisma.user.findFirst({
+        where: {
+          OR: [{ email: normalizedEmail }, { username }],
+          NOT: userType !== "ADMIN" ? { id: userId } : undefined,
+        },
+        select: { id: true },
+      }),
+    ]);
+
+    if (adminCollision || userCollision) {
+      return { ok: false as const, message: "Email or username already in use by another account." };
+    }
+
+    if (userType === "ADMIN") {
+      await prisma.admin.update({
+        where: { id: userId },
+        data: {
+          name,
+          email: normalizedEmail,
+          username,
+          image: image || null,
+        },
       });
-
-      if (existingUser) {
-         return { ok: false as const, message: "Email or username already in use" };
-      }
-
+    } else {
       await prisma.user.update({
-         where: { id: userId },
-         data: {
-            name: parsedInput.name,
-            email: parsedInput.email,
-            username: parsedInput.username,
-            image: parsedInput.image || null,
-         },
+        where: { id: userId },
+        data: {
+          name,
+          email: normalizedEmail,
+          username,
+          image: image || null,
+        },
       });
+    }
 
-      revalidatePath("/profile");
-      return { ok: true as const, message: "Profile updated successfully" };
-   });
+    revalidatePath("/profile");
+    return { ok: true as const, message: "Profile updated successfully" };
+  });
 
 export const changePassword = actionClient
-   .schema(changePasswordSchema)
-   .action(async ({ parsedInput }) => {
-      const session = await auth();
-      if (!session?.user?.id) {
-         return { ok: false as const, message: "Unauthorized" };
-      }
+  .schema(changePasswordSchema)
+  .action(async ({ parsedInput }) => {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { ok: false as const, message: "Unauthorized" };
+    }
 
-      const userId = BigInt(session.user.id);
+    const userType = session.user.userType;
+    const userId = BigInt(session.user.id);
+    const { oldPassword, newPassword } = parsedInput;
 
-      const user = await prisma.user.findUnique({
-         where: { id: userId },
+    if (userType === "ADMIN") {
+      const admin = await prisma.admin.findUnique({
+        where: { id: userId },
       });
 
-      if (!user) {
-         return { ok: false as const, message: "User not found" };
+      if (!admin) {
+        return { ok: false as const, message: "Admin account not found" };
       }
 
-      if (!user.password) {
-         return {
-            ok: false as const,
-            message: "This account was created with OAuth and does not have a password set.",
-         };
-      }
-
-      // Verify old password
-      const isPasswordValid = await verifyPassword(parsedInput.oldPassword, user.password);
-
+      const isPasswordValid = await verifyPassword(oldPassword, admin.password);
       if (!isPasswordValid) {
-         return { ok: false as const, message: "Current password is incorrect" };
+        return { ok: false as const, message: "Current password is incorrect" };
       }
 
-      // Hash new password
-      const hashedPassword = await hashPassword(parsedInput.newPassword);
+      const hashedPassword = await hashPassword(newPassword);
 
-      await prisma.user.update({
-         where: { id: userId },
-         data: { password: hashedPassword, sessionVersion: { increment: 1 } },
+      await prisma.admin.update({
+        where: { id: userId },
+        data: { password: hashedPassword, sessionVersion: { increment: 1 } },
       });
+
+      if (admin.email) {
+        resetExponentialLockout(`exp:account:${admin.email.toLowerCase().trim()}`);
+      }
 
       revalidatePath("/profile");
       return { ok: true as const, message: "Password changed successfully" };
-   });
+    } else {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        return { ok: false as const, message: "User account not found" };
+      }
+
+      if (!user.password) {
+        return {
+          ok: false as const,
+          message: "This account was created with OAuth and does not have a password set.",
+        };
+      }
+
+      const isPasswordValid = await verifyPassword(oldPassword, user.password);
+      if (!isPasswordValid) {
+        return { ok: false as const, message: "Current password is incorrect" };
+      }
+
+      const hashedPassword = await hashPassword(newPassword);
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: { password: hashedPassword, sessionVersion: { increment: 1 } },
+      });
+
+      if (user.email) {
+        resetExponentialLockout(`exp:account:${user.email.toLowerCase().trim()}`);
+      }
+
+      revalidatePath("/profile");
+      return { ok: true as const, message: "Password changed successfully" };
+    }
+  });
