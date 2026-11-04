@@ -8,6 +8,7 @@ export default function ForgotRequestForm() {
   const { executeAsync, status, result } = useAction(sendResetOtp);
   const [email, setEmail] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   const fieldError = useMemo(() => {
     const errs = (result?.validationErrors ?? {}) as Record<string, string[] | undefined>;
@@ -17,11 +18,14 @@ export default function ForgotRequestForm() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
+    setErr(null);
     const res = await executeAsync({ email });
     if (res?.data?.ok) {
       setMsg("If this email exists, we’ve sent a code. Check your inbox.");
       // route to verify page and pass email in query for convenience
       window.location.href = `/forgot/verify?email=${encodeURIComponent(email)}`;
+    } else {
+      setErr(res?.data?.message ?? res?.serverError ?? "Failed to request reset code. Please try again.");
     }
   }
 
@@ -34,7 +38,10 @@ export default function ForgotRequestForm() {
           type="email"
           required
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            if (err) setErr(null);
+          }}
           className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-sidebar-ring"
           placeholder="you@example.com"
           aria-invalid={!!fieldError}
@@ -43,6 +50,7 @@ export default function ForgotRequestForm() {
         {fieldError ? <p id="email-error" className="text-xs text-destructive">{fieldError}</p> : null}
       </div>
 
+      {err ? <p className="text-sm text-destructive">{err}</p> : null}
       {msg ? <p className="text-sm text-green-600">{msg}</p> : null}
 
       <button
