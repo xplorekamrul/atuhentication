@@ -8,6 +8,14 @@ import FacebookProvider from "next-auth/providers/facebook";
 import "server-only";
 import { prisma } from "./prisma";
 import { recordLoginHistory } from "./login-history";
+import {
+  getClientIp,
+  incrementRateLimit,
+  checkExponentialLockout,
+  recordExponentialFailure,
+  recordSpamWhileLocked,
+  resetExponentialLockout,
+} from "./rate-limit";
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
@@ -31,6 +39,67 @@ export const authOptions: NextAuthOptions = {
         const identifier = (creds?.email ?? "").trim();
         const password = creds?.password ?? "";
 
+        if (!identifier || !password) return null;
+
+        const headers = req?.headers as Record<string, string | string[]> | undefined;
+        const ip = getClientIp(headers);
+
+        // 1. IP Burst Rate Limiter with Exponential Escalation (1h -> 2h -> 4h -> 8h -> 24h)
+        const ipBurstLockKey = `exp:burst:ip:${ip}`;
+        const burstLockCheck = checkExponentialLockout(ipBurstLockKey);
+        if (burstLockCheck.locked) {
+          const penalized = recordSpamWhileLocked(ipBurstLockKey, { threshold: 1, baseLockSeconds: 3600 });
+          throw new Error(
+            `High volume of login requests detected. Network blocked for ${penalized.formattedDuration}. Please try later.`
+          );
+        }
+
+        // Check sliding window: max 30 requests per 3 minutes
+        const burstWindow = incrementRateLimit(`burst:window:ip:${ip}`, 30, 180);
+        if (!burstWindow.success) {
+          const lockResult = recordExponentialFailure(ipBurstLockKey, { threshold: 1, baseLockSeconds: 3600 });
+          throw new Error(
+            `High volume of login requests detected. Network blocked for ${lockResult.formattedDuration}. Please try later.`
+          );
+        }
+
+        // 2. Account & IP Failed Attempts / Exponential Lockout Protection
+        const accountLockKey = `exp:account:${identifier.toLowerCase()}`;
+        const ipFailLockKey = `exp:fail:ip:${ip}`;
+
+        const accountLockCheck = checkExponentialLockout(accountLockKey);
+        if (accountLockCheck.locked) {
+          const penalized = recordSpamWhileLocked(accountLockKey, { threshold: 5, baseLockSeconds: 3600 });
+          throw new Error(
+            `Account temporarily locked due to too many failed attempts. Try again in ${penalized.formattedDuration}.`
+          );
+        }
+
+        const ipLockCheck = checkExponentialLockout(ipFailLockKey);
+        if (ipLockCheck.locked) {
+          const penalized = recordSpamWhileLocked(ipFailLockKey, { threshold: 15, baseLockSeconds: 3600 });
+          throw new Error(
+            `Too many failed login attempts from this network. Try again in ${penalized.formattedDuration}.`
+          );
+        }
+
+        const recordFailedAttempt = () => {
+          if (identifier) {
+            const accResult = recordExponentialFailure(accountLockKey, { threshold: 5, baseLockSeconds: 3600 });
+            if (accResult.locked) {
+              throw new Error(
+                `Account temporarily locked due to too many failed attempts. Try again in ${accResult.formattedDuration}.`
+              );
+            }
+          }
+          const ipResult = recordExponentialFailure(ipFailLockKey, { threshold: 15, baseLockSeconds: 3600 });
+          if (ipResult.locked) {
+            throw new Error(
+              `Too many failed login attempts from this network. Try again in ${ipResult.formattedDuration}.`
+            );
+          }
+        };
+
         // Try admin first
         const admin = await prisma.admin.findFirst({
           where: {
@@ -43,17 +112,19 @@ export const authOptions: NextAuthOptions = {
 
         if (admin) {
           const ok = await bcrypt.compare(password, admin.password);
-          if (!ok) return null;
+          if (!ok) {
+            recordFailedAttempt();
+            return null;
+          }
 
           // Block suspended admin
           if (admin.status === "SUSPENDED") return null;
 
+          // Successful login: reset account failed attempts
+          resetExponentialLockout(accountLockKey);
+
           // Log admin login history
           try {
-            const headers = req?.headers as Record<string, string | string[]> | undefined;
-            let ip = (headers?.["x-forwarded-for"] as string) || (headers?.["x-real-ip"] as string) || "Unknown IP";
-            if (Array.isArray(ip)) ip = ip[0];
-
             let ua = (headers?.["user-agent"] as string) || "Unknown User Agent";
             if (Array.isArray(ua)) ua = ua[0];
 
@@ -91,23 +162,31 @@ export const authOptions: NextAuthOptions = {
           },
         });
 
-        if (!user) return null;
+        if (!user) {
+          recordFailedAttempt();
+          return null;
+        }
 
         // User must have a password for credentials login (OAuth-only users won't have one)
-        if (!user.password) return null;
+        if (!user.password) {
+          recordFailedAttempt();
+          return null;
+        }
 
         // Block suspended user
         if (user.status === "SUSPENDED") return null;
 
         const ok = await bcrypt.compare(password, user.password);
-        if (!ok) return null;
+        if (!ok) {
+          recordFailedAttempt();
+          return null;
+        }
+
+        // Successful login: reset account failed attempts
+        resetExponentialLockout(accountLockKey);
 
         // Log user login history
         try {
-          const headers = req?.headers as Record<string, string | string[]> | undefined;
-          let ip = (headers?.["x-forwarded-for"] as string) || (headers?.["x-real-ip"] as string) || "Unknown IP";
-          if (Array.isArray(ip)) ip = ip[0];
-
           let ua = (headers?.["user-agent"] as string) || "Unknown User Agent";
           if (Array.isArray(ua)) ua = ua[0];
 

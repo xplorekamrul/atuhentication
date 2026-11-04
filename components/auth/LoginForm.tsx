@@ -38,7 +38,8 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
       });
 
       if (res?.error) {
-        setFormError("Invalid email or password.");
+        const isCustom = res.error && res.error !== "CredentialsSignin" && res.error !== "Configuration";
+        setFormError(isCustom ? res.error : "Invalid email or password.");
         setLoading(false);
         return;
       }

@@ -5,7 +5,8 @@ import { forgotVerifySchema } from "@/lib/validations/auth";
 import { prisma } from "@/lib/prisma";
 import { verifyOtp } from "@/lib/otp";
 import { signResetToken } from "@/lib/reset-token";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { getClientIp, incrementRateLimit } from "@/lib/rate-limit";
 
 const MAX_ATTEMPTS = 5;
 
@@ -13,6 +14,17 @@ export const verifyResetOtp = actionClient
   .schema(forgotVerifySchema)
   .action(async ({ parsedInput }) => {
     const { email, code } = parsedInput;
+
+    // Rate limit verification attempts by IP
+    const headerList = await headers();
+    const ip = getClientIp(headerList);
+    const ipLimit = incrementRateLimit(`otp:verify:ip:${ip}`, 10, 5 * 60);
+    if (!ipLimit.success) {
+      return {
+        ok: false as const,
+        message: `Too many verification attempts from this network. Please wait ${Math.ceil(ipLimit.resetInSeconds / 60)} minute(s).`,
+      };
+    }
 
     const record = await prisma.passwordResetOtp.findFirst({
       where: {
