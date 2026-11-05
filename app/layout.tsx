@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import "./globals.css";
 
-export const metadata: Metadata = { title: "ArrowheadIt" };
+export const metadata: Metadata = { title: "rareviewit" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -23,9 +23,9 @@ SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER="youremail@gmail.com"
 SMTP_PASS="gihyiybutxplojxn"
-SMTP_FROM="ArrowheadIt.com <no-reply@ArrowheadIt.com>"
+SMTP_FROM="rareviewit.com <no-reply@rareviewit.com>"
 ADMIN_EMAIL="youremail@gmail.com"
-COMPANY_NAME="ArrowheadIt"
+COMPANY_NAME="rareviewit"
 
 
 
