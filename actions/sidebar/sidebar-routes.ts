@@ -1,4 +1,4 @@
-import { adminAuth } from '@/lib/admin-auth';
+import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 export type SidebarRoute = {
@@ -13,8 +13,8 @@ export type SidebarRoute = {
  */
 export async function getRoutesWithPermissions() {
    // Get admin info OUTSIDE of cache scope
-   const session = await adminAuth();
-   const adminId = session?.user?.id ? BigInt(session.user.id) : null;
+   const session = await auth();
+   const adminId = session?.user?.id ? session.user.id : null;
    const adminLevel = (session?.user as any)?.level as string | undefined;
 
    // Get admin accessible groups OUTSIDE of cache scope

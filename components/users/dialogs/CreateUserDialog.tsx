@@ -3,6 +3,7 @@ import { AdminLevel } from "@prisma/client";
 import { Eye, EyeOff } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 type Props = {
   open: boolean;
@@ -34,9 +35,12 @@ export default function CreateUserDialog({ open, onOpenChange, onCreated }: Prop
     e.preventDefault();
     const res = await executeAsync({ name, username, email, role, password: pw });
     if (res?.data?.ok) {
+      toast.success(res.data.message || "Admin created successfully");
       onCreated();
       onOpenChange(false);
       setName(""); setUsername(""); setEmail(""); setRole(AdminLevel.ADMIN); setPw("");
+    } else {
+      toast.error(res?.data?.message || res?.serverError || "Failed to create admin");
     }
   }
 

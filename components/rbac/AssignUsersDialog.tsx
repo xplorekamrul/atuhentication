@@ -75,7 +75,7 @@ export default function AssignUsersDialog({
     });
   }, [open, role, doListRoleUsers, doListUsers]);
 
-  const normalizeId = (id: string | bigint): string => String(id);
+  const normalizeId = (id: string | bigint): string => String(id).replace(/^admin-/, "");
 
   async function handleAssignUser(user: User) {
     if (!role) return;

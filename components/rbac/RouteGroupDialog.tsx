@@ -80,7 +80,7 @@ export default function RouteGroupDialog({
 
    return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-         <DialogContent className="sm:max-w-[425px]">
+         <DialogContent className="sm:max-w-106">
             <DialogHeader>
                <DialogTitle>
                   {group ? "Edit Route Group" : "Create Route Group"}
@@ -125,7 +125,7 @@ export default function RouteGroupDialog({
                   <Button
                      type="submit"
                      disabled={isPending}
-                     className="bg-primary text-primary-foreground hover:bg-greencolor"
+                     className="bg-primary text-primary-foreground hover:bg-scolor"
                   >
                      {isPending ? "Saving..." : group ? "Update" : "Create"}
                   </Button>

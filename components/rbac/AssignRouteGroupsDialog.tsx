@@ -105,7 +105,7 @@ export default function AssignRouteGroupsDialog({
 
    return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-         <DialogContent className="sm:max-w-[500px]">
+         <DialogContent className="sm:max-w-125">
             <DialogHeader>
                <DialogTitle>Assign Route Groups to Role</DialogTitle>
                <DialogDescription>
@@ -178,7 +178,7 @@ export default function AssignRouteGroupsDialog({
                   <Button
                      type="submit"
                      disabled={isPending}
-                     className="bg-primary text-primary-foreground hover:bg-greencolor"
+                     className="bg-primary text-primary-foreground hover:bg-scolor"
                   >
                      {isPending ? "Assigning..." : "Assign"}
                   </Button>

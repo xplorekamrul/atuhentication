@@ -172,7 +172,7 @@ export default function AssignRoutesDialog({
                      <Button
                         type="submit"
                         disabled={isPending}
-                        className="bg-primary text-primary-foreground hover:bg-greencolor"
+                        className="bg-primary text-primary-foreground hover:bg-scolor"
                      >
                         {isPending ? "Saving..." : "Save"}
                      </Button>

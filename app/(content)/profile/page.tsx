@@ -13,14 +13,13 @@ export default async function ProfilePage() {
    }
 
    const userType = (session?.user as any)?.userType as string | undefined;
-   const userId = BigInt(session.user.id);
 
    let user: any = null;
 
    // Fetch from appropriate table based on user type
    if (userType === "ADMIN") {
       user = await prisma.admin.findUnique({
-         where: { id: userId },
+         where: { id: session.user.id },
          select: {
             name: true,
             email: true,
@@ -28,12 +27,13 @@ export default async function ProfilePage() {
             image: true,
             profile: true,
             loginHistory: {
-               take: 10,
+               take: 100,
                orderBy: { createdAt: "desc" },
             },
          },
       });
    } else {
+      const userId = BigInt(session.user.id);
       user = await prisma.user.findUnique({
          where: { id: userId },
          select: {
@@ -43,7 +43,7 @@ export default async function ProfilePage() {
             image: true,
             profile: true,
             loginHistory: {
-               take: 10,
+               take: 100,
                orderBy: { createdAt: "desc" },
             },
          },
@@ -80,7 +80,7 @@ export default async function ProfilePage() {
    }));
 
    return (
-      <div className="p-8 space-y-8 max-w-5xl mx-auto">
+      <div className="p-4 sm:p-8 space-y-8 max-w-5xl mx-auto">
          <h1 className="text-3xl font-bold">My Profile</h1>
 
          <div className="grid gap-8 md:grid-cols-2">

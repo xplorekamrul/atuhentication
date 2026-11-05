@@ -12,17 +12,17 @@ const listRoleUsersSchema = z.object({
 });
 
 const assignUserToRoleSchema = z.object({
-   adminId: z.string().or(z.number()), 
+   adminId: z.string().min(1, "Admin ID is required"), 
    roleId: z.string().or(z.number()),
 });
 
 const removeUserFromRoleSchema = z.object({
-   adminId: z.string().or(z.number()),
+   adminId: z.string().min(1, "Admin ID is required"),
    roleId: z.string().or(z.number()),
 });
 
 const assignMultipleRolesToUserSchema = z.object({
-   adminId: z.string().or(z.number()),
+   adminId: z.string().min(1, "Admin ID is required"),
    roleIds: z.array(z.string().or(z.number())).min(1, "At least one role is required"),
 });
 
@@ -86,17 +86,17 @@ export const listRoleUsers = developerActionClient
 export const assignUserToRole = developerActionClient
    .inputSchema(assignUserToRoleSchema)
    .action(async ({ parsedInput }) => {
-      const { adminId, roleId } = parsedInput;
-      const adminIdBigInt = toBigIntOrNull(adminId);
+      const { adminId: rawAdminId, roleId } = parsedInput;
+      const adminId = rawAdminId.trim();
       const roleIdBigInt = toBigIntOrNull(roleId);
 
-      if (!adminIdBigInt || !roleIdBigInt) {
+      if (!adminId || !roleIdBigInt) {
          return { ok: false as const, error: "Invalid admin or role ID" };
       }
 
       // Check if admin exists
       const admin = await prisma.admin.findUnique({
-         where: { id: adminIdBigInt },
+         where: { id: adminId },
       });
 
       if (!admin) {
@@ -116,7 +116,7 @@ export const assignUserToRole = developerActionClient
       const existing = await prisma.adminRole.findUnique({
          where: {
             adminId_roleId: {
-               adminId: adminIdBigInt,
+               adminId,
                roleId: roleIdBigInt,
             },
          },
@@ -129,7 +129,7 @@ export const assignUserToRole = developerActionClient
       // Create admin-role assignment
       await prisma.adminRole.create({
          data: {
-            adminId: adminIdBigInt,
+            adminId,
             roleId: roleIdBigInt,
          },
       });
@@ -140,18 +140,18 @@ export const assignUserToRole = developerActionClient
 export const removeUserFromRole = developerActionClient
    .inputSchema(removeUserFromRoleSchema)
    .action(async ({ parsedInput }) => {
-      const { adminId, roleId } = parsedInput;
-      const adminIdBigInt = toBigIntOrNull(adminId);
+      const { adminId: rawAdminId, roleId } = parsedInput;
+      const adminId = rawAdminId.trim();
       const roleIdBigInt = toBigIntOrNull(roleId);
 
-      if (!adminIdBigInt || !roleIdBigInt) {
+      if (!adminId || !roleIdBigInt) {
          return { ok: false as const, error: "Invalid admin or role ID" };
       }
 
       try {
          // Check if admin exists
          const admin = await prisma.admin.findUnique({
-            where: { id: adminIdBigInt },
+            where: { id: adminId },
             select: { id: true, email: true },
          });
 
@@ -162,7 +162,7 @@ export const removeUserFromRole = developerActionClient
          // Delete the admin-role assignment
          await prisma.adminRole.deleteMany({
             where: {
-               adminId: adminIdBigInt,
+               adminId,
                roleId: roleIdBigInt,
             },
          });
@@ -179,16 +179,16 @@ export const removeUserFromRole = developerActionClient
 export const assignMultipleRolesToUser = developerActionClient
    .inputSchema(assignMultipleRolesToUserSchema)
    .action(async ({ parsedInput }) => {
-      const { adminId, roleIds } = parsedInput;
-      const adminIdBigInt = toBigIntOrNull(adminId);
+      const { adminId: rawAdminId, roleIds } = parsedInput;
+      const adminId = rawAdminId.trim();
 
-      if (!adminIdBigInt) {
+      if (!adminId) {
          return { ok: false as const, error: "Invalid admin ID" };
       }
 
       // Check if admin exists
       const admin = await prisma.admin.findUnique({
-         where: { id: adminIdBigInt },
+         where: { id: adminId },
       });
 
       if (!admin) {
@@ -213,13 +213,13 @@ export const assignMultipleRolesToUser = developerActionClient
 
       // Delete existing roles for this admin
       await prisma.adminRole.deleteMany({
-         where: { adminId: adminIdBigInt },
+         where: { adminId },
       });
 
       // Create new role assignments
       await prisma.adminRole.createMany({
          data: roleIdsBigInt.map((roleId) => ({
-            adminId: adminIdBigInt,
+            adminId,
             roleId,
          })),
       });

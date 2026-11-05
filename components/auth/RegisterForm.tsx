@@ -8,6 +8,7 @@ import { useAction } from "next-safe-action/hooks";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../ui/button";
+import OAuthButtons from "./OAuthButtons";
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -51,8 +52,14 @@ export default function RegisterForm() {
         // Wait for session to be updated
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Redirect to home page for users
-        router.push("/");
+        // Check the session to determine redirect
+        const session = await fetch("/api/auth/session").then(r => r.json());
+
+        if (session?.user?.userType === "ADMIN") {
+          router.push("/admin");
+        } else {
+          router.push("/");
+        }
       } else {
         setFormError(loginRes.error || "Login failed after registration.");
       }
@@ -77,7 +84,7 @@ export default function RegisterForm() {
             text-foreground placeholder:text-muted-foreground
             focus:outline-none focus:ring-2 focus:ring-sidebar-ring
           "
-          placeholder="Your Name "
+          placeholder="Jane Doe"
           aria-invalid={!!fieldErrors.name}
           aria-describedby={fieldErrors.name ? "name-error" : undefined}
         />
@@ -100,7 +107,7 @@ export default function RegisterForm() {
             text-foreground placeholder:text-muted-foreground
             focus:outline-none focus:ring-2 focus:ring-sidebar-ring
           "
-          placeholder="username"
+          placeholder="janedoe"
           aria-invalid={!!fieldErrors.username}
           aria-describedby={fieldErrors.username ? "username-error" : undefined}
         />
@@ -160,7 +167,7 @@ export default function RegisterForm() {
             onClick={() => setShowPw((v) => !v)}
             className="
               absolute inset-y-0 right-2 my-auto inline-flex h-8 w-8 items-center justify-center
-              rounded-md text-muted-foreground hover:text-textcolor
+              rounded-md text-muted-foreground hover:text-hcolor
               focus:outline-none focus:ring-2 focus:ring-sidebar-ring
             "
             aria-label={showPw ? "Hide password" : "Show password"}
@@ -200,9 +207,12 @@ export default function RegisterForm() {
         )}
       </Button>
 
+      {/* OAuth Sign-Up Buttons */}
+      <OAuthButtons callbackUrl="/" />
+
       <p className="text-sm text-center text-muted-foreground">
         Already have an account?{" "}
-        <a href="/login" className="underline decoration-dotted text-linkcolor hover:text-textcolor">
+        <a href="/login" className="underline decoration-dotted text-linkcolor hover:text-hcolor">
           Login
         </a>
       </p>

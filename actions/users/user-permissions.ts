@@ -1,6 +1,6 @@
 "use server";
 
-import { adminAuth } from "@/lib/admin-auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export type RouteWithGroup = {
@@ -20,13 +20,13 @@ export type RouteWithGroup = {
  */
 export async function getAccessibleRoutes() {
    try {
-      const session = await adminAuth();
+      const session = await auth();
 
       if (!session?.user?.id) {
          return null;
       }
 
-      const adminId = BigInt(session.user.id);
+      const adminId = session.user.id;
       const admin = await prisma.admin.findUnique({
          where: { id: adminId },
          select: {
@@ -89,7 +89,7 @@ export async function getAccessibleRoutes() {
  */
 export async function getAllRoutes(): Promise<RouteWithGroup[]> {
    try {
-      const session = await adminAuth();
+      const session = await auth();
       const level = (session?.user as any)?.level as string | undefined;
 
       // For SUPER_ADMIN and DEVELOPER, return hardcoded routes
@@ -136,5 +136,92 @@ export async function getAllRoutes(): Promise<RouteWithGroup[]> {
  */
 function getHardcodedRoutes(): RouteWithGroup[] {
    return [
-   ]
+      // HR Group
+      {
+         id: "1",
+         path: "/daily-attendance",
+         name: "Daily Attendance",
+         groupId: "1",
+         group: { id: "1", name: "HR" },
+      },
+      {
+         id: "2",
+         path: "/attendance-report",
+         name: "Attendance Report",
+         groupId: "1",
+         group: { id: "1", name: "HR" },
+      },
+      {
+         id: "3",
+         path: "/monthly-attendance",
+         name: "Monthly Attendance",
+         groupId: "1",
+         group: { id: "1", name: "HR" },
+      },
+      {
+         id: "4",
+         path: "/holidays",
+         name: "Holidays",
+         groupId: "1",
+         group: { id: "1", name: "HR" },
+      },
+      {
+         id: "5",
+         path: "/leave",
+         name: "Leave Management",
+         groupId: "1",
+         group: { id: "1", name: "HR" },
+      },
+      {
+         id: "6",
+         path: "/showcause",
+         name: "Showcause",
+         groupId: "1",
+         group: { id: "1", name: "HR" },
+      },
+      // Employees Group
+      {
+         id: "7",
+         path: "/employees",
+         name: "Employees",
+         groupId: "2",
+         group: { id: "2", name: "Employees" },
+      },
+      // Admin Group
+      {
+         id: "8",
+         path: "/users",
+         name: "Users",
+         groupId: "3",
+         group: { id: "3", name: "Admin" },
+      },
+      {
+         id: "9",
+         path: "/rbac",
+         name: "RBAC",
+         groupId: "3",
+         group: { id: "3", name: "Admin" },
+      },
+      {
+         id: "10",
+         path: "/devices",
+         name: "Devices",
+         groupId: "3",
+         group: { id: "3", name: "Admin" },
+      },
+      {
+         id: "11",
+         path: "/shifts",
+         name: "Shifts",
+         groupId: "3",
+         group: { id: "3", name: "Admin" },
+      },
+      {
+         id: "12",
+         path: "/hr",
+         name: "HR Settings",
+         groupId: "3",
+         group: { id: "3", name: "Admin" },
+      },
+   ];
 }

@@ -3,18 +3,25 @@
 import { updateUserInfo } from "@/actions/users/update-user-info";
 import { useAction } from "next-safe-action/hooks";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  user: { id: string; name: string | null; email: string };
+  user: { id: string; name: string | null; email: string; userType?: "ADMIN" | "USER" };
   onSaved: () => void;
 };
 
 export default function EditInfoDialog({ open, onOpenChange, user, onSaved }: Props) {
   const [name, setName] = useState(user.name ?? "");
   const [email, setEmail] = useState(user.email);
-  useEffect(() => { setName(user.name ?? ""); setEmail(user.email); }, [user]);
+  const [serverError, setServerError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setName(user.name ?? "");
+    setEmail(user.email);
+    setServerError(null);
+  }, [user, open]);
 
   const { executeAsync, result, status } = useAction(updateUserInfo);
   const fieldErrors = useMemo(() => {
@@ -24,10 +31,16 @@ export default function EditInfoDialog({ open, onOpenChange, user, onSaved }: Pr
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const res = await executeAsync({ id: user.id, name, email });
+    setServerError(null);
+    const res = await executeAsync({ id: user.id, userType: user.userType, name, email });
     if (res?.data?.ok) {
+      toast.success("User info updated successfully");
       onSaved();
       onOpenChange(false);
+    } else {
+      const errorMsg = res?.data?.message ?? res?.serverError ?? "Failed to update user info";
+      setServerError(errorMsg);
+      toast.error(errorMsg);
     }
   }
 
@@ -42,10 +55,13 @@ export default function EditInfoDialog({ open, onOpenChange, user, onSaved }: Pr
             <input
               className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (serverError) setServerError(null);
+              }}
               aria-invalid={!!fieldErrors.name}
             />
-            {fieldErrors.name ? <p className="text-xs text-destructive">{fieldErrors.name}</p> : null}
+            {fieldErrors.name ? <p className="text-xs text-destructive mt-1">{fieldErrors.name}</p> : null}
           </div>
           <div>
             <label className="text-sm">Email</label>
@@ -53,23 +69,31 @@ export default function EditInfoDialog({ open, onOpenChange, user, onSaved }: Pr
               className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (serverError) setServerError(null);
+              }}
               aria-invalid={!!fieldErrors.email}
             />
-            {fieldErrors.email ? <p className="text-xs text-destructive">{fieldErrors.email}</p> : null}
+            {fieldErrors.email ? <p className="text-xs text-destructive mt-1">{fieldErrors.email}</p> : null}
           </div>
+          {serverError ? <p className="text-sm text-destructive">{serverError}</p> : null}
         </div>
 
-        {result?.data && !result.data.ok ? (
-          <p className="mt-2 text-sm text-destructive">{result.data.message ?? "Update failed"}</p>
-        ) : null}
-
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={() => onOpenChange(false)} className="px-3 py-2 rounded-md border cursor-pointer">
+          <button
+            type="button"
+            className="rounded-md border border-border px-3 py-2 text-sm"
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </button>
-          <button disabled={status === "executing"} className="px-3 py-2 rounded-md bg-primary text-white cursor-pointer">
-            Save
+          <button
+            type="submit"
+            disabled={status === "executing"}
+            className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-60"
+          >
+            {status === "executing" ? "Saving..." : "Save"}
           </button>
         </div>
       </form>

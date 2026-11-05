@@ -1,6 +1,6 @@
 'use server';
 
-import { adminAuth } from '@/lib/admin-auth';
+import { auth } from '@/lib/auth';
 import { matchesPattern } from '@/lib/permissions/route-pattern-matcher';
 import { prisma } from '@/lib/prisma';
 
@@ -28,7 +28,7 @@ export type FilteredRoutesResult = {
  * Visibility controls sidebar display.
  * Editability controls what actions can be performed (checked in proxy/permissions).
  */
-export async function getAccessibleRoutePaths(adminId: bigint, level: string): Promise<string[]> {
+export async function getAccessibleRoutePaths(adminId: string, level: string): Promise<string[]> {
    // DEVELOPER has full access
    if (level === 'DEVELOPER') {
       return []; // Empty array means full access
@@ -42,7 +42,7 @@ export async function getAccessibleRoutePaths(adminId: bigint, level: string): P
          },
          select: { path: true },
       });
-      // console.log('[getAccessibleRoutePaths] SUPER_ADMIN routes:', routes.map(r => r.path));
+      console.log('[getAccessibleRoutePaths] SUPER_ADMIN routes:', routes.map(r => r.path));
       return routes.map((r) => r.path);
    }
 
@@ -58,7 +58,7 @@ export async function getAccessibleRoutePaths(adminId: bigint, level: string): P
       });
 
       if (!admin || admin.adminRoles.length === 0) {
-         // console.log('[getAccessibleRoutePaths] ADMIN has no roles');
+         console.log('[getAccessibleRoutePaths] ADMIN has no roles');
          return [];
       }
 
@@ -100,7 +100,7 @@ export async function getFilteredSidebarRoutes(
    hardcodedRoutes: NavNodeData[]
 ): Promise<FilteredRoutesResult> {
    try {
-      const session = await adminAuth();
+      const session = await auth();
       if (!session?.user?.id) {
          console.log('[getFilteredSidebarRoutes] No session or user ID');
          return { routes: [], noRoutesInDatabase: false };
@@ -110,7 +110,7 @@ export async function getFilteredSidebarRoutes(
       const userType = (session.user as any)?.userType as string | undefined;
 
       if (!level || !userType) {
-         // console.log('[getFilteredSidebarRoutes] No level or userType');
+         console.log('[getFilteredSidebarRoutes] No level or userType');
          return { routes: [], noRoutesInDatabase: false };
       }
 
@@ -118,7 +118,7 @@ export async function getFilteredSidebarRoutes(
 
       // Only admins can access admin routes
       if (userType !== 'ADMIN') {
-         // console.log('[getFilteredSidebarRoutes] Not an admin user');
+         console.log('[getFilteredSidebarRoutes] Not an admin user');
          return { routes: [], noRoutesInDatabase: false };
       }
 
@@ -130,18 +130,18 @@ export async function getFilteredSidebarRoutes(
 
       // Check if there are any routes in the database at all
       const totalRoutesInDb = await prisma.route.count();
-      // console.log('[getFilteredSidebarRoutes] Total routes in database:', totalRoutesInDb);
+      console.log('[getFilteredSidebarRoutes] Total routes in database:', totalRoutesInDb);
 
       // If no routes in database for SUPER_ADMIN or ADMIN, return special flag
       if (totalRoutesInDb === 0 && (level === 'SUPER_ADMIN' || level === 'ADMIN')) {
-         // console.log('[getFilteredSidebarRoutes] No routes in database');
+         console.log('[getFilteredSidebarRoutes] No routes in database');
          return { routes: [], noRoutesInDatabase: true };
       }
 
       // For ADMIN: check if user has any roles assigned
       if (level === 'ADMIN') {
          const admin = await prisma.admin.findUnique({
-            where: { id: BigInt(session.user.id) },
+            where: { id: session.user.id },
             select: { adminRoles: { select: { roleId: true } } },
          });
 
@@ -152,16 +152,16 @@ export async function getFilteredSidebarRoutes(
       }
 
       // Get accessible routes for SUPER_ADMIN and ADMIN
-      const adminId = BigInt(session.user.id);
+      const adminId = session.user.id;
       const accessibleRoutes = await getAccessibleRoutePaths(adminId, level);
 
-      // console.log('[getFilteredSidebarRoutes] Accessible routes:', accessibleRoutes);
+      console.log('[getFilteredSidebarRoutes] Accessible routes:', accessibleRoutes);
 
       // Filter hardcoded nav items against accessible routes from database
       const filtered = filterNavNodes(hardcodedRoutes, accessibleRoutes);
       return { routes: filtered, noRoutesInDatabase: false };
    } catch (error) {
-      // console.error('[getFilteredSidebarRoutes] Error filtering sidebar routes:', error);
+      console.error('[getFilteredSidebarRoutes] Error filtering sidebar routes:', error);
       // On error, return empty array to be safe
       return { routes: [], noRoutesInDatabase: false };
    }
@@ -201,7 +201,7 @@ function filterNavNodes(
             matchesPattern(route, node.href)
          );
 
-         // console.log(`[filterNavNodes] Route: ${node.href}, Accessible: ${isAccessible}`);
+         console.log(`[filterNavNodes] Route: ${node.href}, Accessible: ${isAccessible}`);
          return isAccessible ? node : null;
       })
       .filter((node): node is NavNodeData => node !== null);

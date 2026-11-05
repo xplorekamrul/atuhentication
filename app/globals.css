@@ -4,25 +4,25 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --primary: #059337;
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: #ae1212;
-  --secondary-foreground: oklch(0.205 0 0);
-
-  --textcolor: #06064f;
-  --text-hover: #5AB2FF;
-  
-  --greencolor: #009966;
-
+  --primary: #009966;
+  --hcolor: #1C1C84;
+  --scolor: #009966;
+  --bcolor: #202122;
+  --linkcolor: #4f4f4f;
   --white: #ffffff;
   --black: #000000;
-
+  --tcolor: #06064f;
+  --greencolor: #016926;
   --light: #eaeaea;
   --radius: 0.625rem;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
+  --primary: #059337;
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
   --accent: oklch(0.97 0 0);

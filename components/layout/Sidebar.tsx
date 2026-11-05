@@ -12,9 +12,9 @@ import {
   Home,
   LogOut,
   Menu,
+  Palette,
   ShieldAlert,
-  Users,
-  ToolCase,
+  Users
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
@@ -25,14 +25,12 @@ type Item = {
   label: string;
   href: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  restriction?: boolean;
 };
 
 type Group = {
   label: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   children: Item[];
-  restriction?: boolean;
 };
 
 type LocalNavNode = Item | Group;
@@ -50,17 +48,16 @@ function initials(name?: string | null, email?: string | null) {
 // Hardcoded navigation structure with icons
 const hardcodedNav: LocalNavNode[] = [
   { label: "Users", href: "/admin/users", icon: Users },
-  { label: "RBAC", href: "/admin/rbac", icon: ShieldAlert, restriction: true, },
-    { label: "Routes Mgt", href: "/developer/routes-management", icon: ToolCase , restriction: true, },
-
+  { label: "RBAC", href: "/admin/rbac", icon: ShieldAlert },
+  { label: "Themes", href: "/admin/themes", icon: Palette },
 ];
 
 /**
  * Reconstruct navigation with icons from hardcoded data
  */
-function reconstructWithIcons(filteredData: any[], userLevel?: string): LocalNavNode[] {
+function reconstructWithIcons(filteredData: any[]): LocalNavNode[] {
   return filteredData
-    .map((node): LocalNavNode | null => {
+    .map((node) => {
       if ("children" in node) {
         // Find matching group in hardcoded nav
         const hardcodedGroup = hardcodedNav.find(
@@ -68,15 +65,9 @@ function reconstructWithIcons(filteredData: any[], userLevel?: string): LocalNav
         ) as Group | undefined;
         if (!hardcodedGroup) return null;
 
-        // Check if group is restricted for SUPER_ADMIN
-        if (userLevel === "SUPER_ADMIN" && hardcodedGroup.restriction) {
-          return null;
-        }
-
         return {
           label: node.label,
           icon: hardcodedGroup.icon,
-          restriction: hardcodedGroup.restriction,
           children: node.children.map((child: any) => {
             const hardcodedChild = hardcodedGroup.children.find(
               (c) => c.href === child.href
@@ -85,7 +76,6 @@ function reconstructWithIcons(filteredData: any[], userLevel?: string): LocalNav
               label: child.label,
               href: child.href,
               icon: hardcodedChild?.icon || Home,
-              restriction: hardcodedChild?.restriction,
             };
           }),
         };
@@ -95,17 +85,10 @@ function reconstructWithIcons(filteredData: any[], userLevel?: string): LocalNav
       const hardcodedItem = hardcodedNav.find(
         (n) => !isGroup(n) && n.href === node.href
       ) as Item | undefined;
-
-      // Check if item is restricted for SUPER_ADMIN
-      if (userLevel === "SUPER_ADMIN" && hardcodedItem?.restriction) {
-        return null;
-      }
-
       return {
         label: node.label,
         href: node.href,
         icon: hardcodedItem?.icon || Home,
-        restriction: hardcodedItem?.restriction,
       };
     })
     .filter((n): n is LocalNavNode => n !== null);
@@ -155,9 +138,8 @@ export default function Sidebar({
 
         setNoRoutesInDatabase(result.noRoutesInDatabase);
 
-        // Reconstruct with icons on client side, passing user level for restriction checks
-        const userLevel = (user as any)?.level as string | undefined;
-        const reconstructed = reconstructWithIcons(result.routes, userLevel);
+        // Reconstruct with icons on client side
+        const reconstructed = reconstructWithIcons(result.routes);
         console.log('[Sidebar] Reconstructed routes:', reconstructed);
 
         // Use exactly what the server returned - no fallback
@@ -209,10 +191,10 @@ export default function Sidebar({
 
   const handleSignOut = async () => {
     try {
-      await signOut({ redirect: false, callbackUrl: "/admin/login" });
-      router.push("/admin/login");
+      await signOut({ redirect: false, callbackUrl: "/login" });
+      router.push("/login");
     } catch {
-      router.push("/admin/login");
+      router.push("/login");
     }
   };
 
@@ -227,7 +209,7 @@ export default function Sidebar({
         aria-label="Sidebar"
       >
         {/* Header - Fixed */}
-        <div className="flex h-14 items-center justify-between px-2 flex-shrink-0">
+        <div className="flex h-14 items-center justify-between px-2 shrink-0">
           <div
             className={clsx(
               "flex items-center gap-2 overflow-hidden transition-opacity",
@@ -254,7 +236,7 @@ export default function Sidebar({
           <Link
             href="/profile"
             className={clsx(
-              "flex items-center gap-2 p-2 flex-shrink-0 rounded-md hover:bg-white/10 transition-colors",
+              "flex items-center gap-2 p-2 shrink-0 rounded-md hover:bg-white/10 transition-colors",
               collapsed ? "justify-center" : ""
             )}
           >
@@ -425,7 +407,7 @@ export default function Sidebar({
         </nav>
 
         {/* Footer - Fixed */}
-        <div className="border-t border-border p-2 flex flex-col gap-2 flex-shrink-0">
+        <div className="border-t border-border p-2 flex flex-col gap-2 shrink-0">
           {user &&
             maybeWrapWithTooltip(
               <button

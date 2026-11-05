@@ -9,21 +9,26 @@ export const createUser = superAdminActionClient
   .schema(createUserSchema)
   .action(async ({ parsedInput }) => {
     const { name, username, email, role, password } = parsedInput;
+    const normalizedEmail = email.toLowerCase().trim();
 
-    const exists = await prisma.admin.findFirst({
-      where: {
-        OR: [{ email }, { username }],
-      },
-    });
+    // Check uniqueness across BOTH Admin and User tables
+    const [adminWithEmail, userWithEmail, adminWithUsername, userWithUsername] = await Promise.all([
+      prisma.admin.findUnique({ where: { email: normalizedEmail }, select: { id: true } }),
+      prisma.user.findUnique({ where: { email: normalizedEmail }, select: { id: true } }),
+      prisma.admin.findUnique({ where: { username }, select: { id: true } }),
+      prisma.user.findUnique({ where: { username }, select: { id: true } }),
+    ]);
 
-    if (exists) {
-      if (exists.email === email) return { ok: false as const, message: "Email already exists." };
-      if (exists.username === username) return { ok: false as const, message: "Username already exists." };
+    if (adminWithEmail || userWithEmail) {
+      return { ok: false as const, message: "Email already exists." };
+    }
+    if (adminWithUsername || userWithUsername) {
+      return { ok: false as const, message: "Username already exists." };
     }
 
     const pwd = await hashPassword(password);
     const admin = await prisma.admin.create({
-      data: { name, username, email, level: role, password: pwd },
+      data: { name, username, email: normalizedEmail, level: role, password: pwd },
       select: { id: true, name: true, username: true, email: true, level: true, status: true },
     });
 

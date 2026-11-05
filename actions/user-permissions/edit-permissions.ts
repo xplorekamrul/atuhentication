@@ -1,6 +1,6 @@
 "use server";
 
-import { adminAuth } from "@/lib/admin-auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { cacheLife, cacheTag } from "next/cache";
 
@@ -15,13 +15,13 @@ import { cacheLife, cacheTag } from "next/cache";
  */
 export async function getEditPermissionForRoute(routePath: string) {
    try {
-      const session = await adminAuth();
+      const session = await auth();
 
       if (!session?.user?.id) {
          return false;
       }
 
-      const adminId = BigInt(session.user.id);
+      const adminId = session.user.id;
       const admin = await prisma.admin.findUnique({
          where: { id: adminId },
          select: {
@@ -49,7 +49,7 @@ export async function getEditPermissionForRoute(routePath: string) {
       return false;
    }
 }
-
+ 
 /**
  * Cached route permission checking
  */
@@ -114,13 +114,13 @@ async function getCachedEditPermission(
  */
 export async function getUserEditPermissions() {
    try {
-      const session = await adminAuth();
+      const session = await auth();
 
       if (!session?.user?.id) {
          return new Map<string, boolean>();
       }
 
-      const adminId = BigInt(session.user.id);
+      const adminId = session.user.id;
       const admin = await prisma.admin.findUnique({
          where: { id: adminId },
          select: {

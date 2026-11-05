@@ -3,20 +3,29 @@
 import { updateUserPassword } from "@/actions/users/update-user-password";
 import { Eye, EyeOff } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   userId: string;
+  userType?: "ADMIN" | "USER";
   onSaved: () => void;
 };
 
-export default function EditPasswordDialog({ open, onOpenChange, userId, onSaved }: Props) {
+export default function EditPasswordDialog({ open, onOpenChange, userId, userType, onSaved }: Props) {
   const [pw, setPw] = useState("");
   const [confirm, setConfirm] = useState("");
   const [show1, setShow1] = useState(false);
   const [show2, setShow2] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPw("");
+    setConfirm("");
+    setServerError(null);
+  }, [open]);
 
   const { executeAsync, status, result } = useAction(updateUserPassword);
   const fieldErrors = useMemo(() => {
@@ -26,11 +35,18 @@ export default function EditPasswordDialog({ open, onOpenChange, userId, onSaved
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const res = await executeAsync({ id: userId, password: pw, confirm });
+    setServerError(null);
+    const res = await executeAsync({ id: userId, userType, password: pw, confirm });
     if (res?.data?.ok) {
+      toast.success("Password updated successfully");
       onSaved();
       onOpenChange(false);
-      setPw(""); setConfirm("");
+      setPw("");
+      setConfirm("");
+    } else {
+      const errorMsg = res?.data?.message ?? res?.serverError ?? "Failed to update password";
+      setServerError(errorMsg);
+      toast.error(errorMsg);
     }
   }
 
@@ -47,13 +63,16 @@ export default function EditPasswordDialog({ open, onOpenChange, userId, onSaved
               className="mt-1 w-full rounded-md border border-border bg-background pl-3 pr-10 py-2"
               type={show1 ? "text" : "password"}
               value={pw}
-              onChange={(e) => setPw(e.target.value)}
+              onChange={(e) => {
+                setPw(e.target.value);
+                if (serverError) setServerError(null);
+              }}
               aria-invalid={!!fieldErrors.password}
             />
             <button type="button" onClick={() => setShow1(v => !v)} className="absolute right-2 top-8 p-1">
               {show1 ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
-            {fieldErrors.password ? <p className="text-xs text-destructive">{fieldErrors.password}</p> : null}
+            {fieldErrors.password ? <p className="text-xs text-destructive mt-1">{fieldErrors.password}</p> : null}
           </div>
 
           <div className="relative">
@@ -62,22 +81,35 @@ export default function EditPasswordDialog({ open, onOpenChange, userId, onSaved
               className="mt-1 w-full rounded-md border border-border bg-background pl-3 pr-10 py-2"
               type={show2 ? "text" : "password"}
               value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
+              onChange={(e) => {
+                setConfirm(e.target.value);
+                if (serverError) setServerError(null);
+              }}
               aria-invalid={!!fieldErrors.confirm}
             />
             <button type="button" onClick={() => setShow2(v => !v)} className="absolute right-2 top-8 p-1">
               {show2 ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
-            {fieldErrors.confirm ? <p className="text-xs text-destructive">{fieldErrors.confirm}</p> : null}
+            {fieldErrors.confirm ? <p className="text-xs text-destructive mt-1">{fieldErrors.confirm}</p> : null}
           </div>
+
+          {serverError ? <p className="text-sm text-destructive">{serverError}</p> : null}
         </div>
 
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={() => onOpenChange(false)} className="px-3 py-2 rounded-md border cursor-pointer">
+          <button
+            type="button"
+            className="rounded-md border border-border px-3 py-2 text-sm"
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </button>
-          <button disabled={status === "executing"} className="px-3 py-2 rounded-md bg-primary text-white cursor-pointer">
-            Save
+          <button
+            type="submit"
+            disabled={status === "executing"}
+            className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-60"
+          >
+            {status === "executing" ? "Saving..." : "Save"}
           </button>
         </div>
       </form>

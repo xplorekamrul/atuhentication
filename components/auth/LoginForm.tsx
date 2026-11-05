@@ -7,8 +7,21 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
+import OAuthButtons from "./OAuthButtons";
 
-export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?: string }) {
+interface LoginFormProps {
+  callbackUrl?: string;
+  showOAuth?: boolean;
+  showRegisterLink?: boolean;
+  isAdminLogin?: boolean;
+}
+
+export default function LoginForm({
+  callbackUrl = "/dashboard",
+  showOAuth = true,
+  showRegisterLink = true,
+  isAdminLogin = false,
+}: LoginFormProps) {
   const router = useRouter();
   const { data: session } = useSession();
   const [form, setForm] = useState<LoginValues>({ email: "", password: "" });
@@ -33,11 +46,13 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
         redirect: false,
         email: form.email,
         password: form.password,
+        loginType: isAdminLogin ? "ADMIN" : "USER",
         callbackUrl,
       });
 
       if (res?.error) {
-        setFormError("Invalid email or password.");
+        const isCustom = res.error && res.error !== "CredentialsSignin" && res.error !== "Configuration";
+        setFormError(isCustom ? res.error : "Invalid email or password.");
         setLoading(false);
         return;
       }
@@ -46,9 +61,16 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
         // Wait for session to be updated
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Redirect to home page for users
-        const redirectUrl = callbackUrl === "/dashboard" ? "/" : callbackUrl;
-        router.push(redirectUrl);
+        // Get the updated session
+        const updatedSession = await fetch("/api/auth/session").then(r => r.json());
+
+        if (isAdminLogin || updatedSession?.user?.userType === "ADMIN") {
+          const redirectUrl = callbackUrl && callbackUrl !== "/dashboard" ? callbackUrl : "/admin";
+          router.push(redirectUrl);
+        } else {
+          const redirectUrl = callbackUrl === "/dashboard" ? "/" : callbackUrl;
+          router.push(redirectUrl);
+        }
       }
     } catch (err) {
       setFormError("Something went wrong.");
@@ -60,7 +82,7 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-2">
         <label htmlFor="email" className="text-sm font-medium text-foreground">
-          Email or Username
+          {isAdminLogin ? "Admin Email or Username" : "Email or Username"}
         </label>
         <input
           id="email"
@@ -74,7 +96,7 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
             text-foreground placeholder:text-muted-foreground
             focus:outline-none focus:ring-2 focus:ring-sidebar-ring
           "
-          placeholder="user@example.com or username"
+          placeholder={isAdminLogin ? "admin@example.com or username" : "user@example.com or username"}
         />
       </div>
 
@@ -86,7 +108,7 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
           <div>
             <Link
               href="/forgot"
-              className="text-sm text-linkcolor hover:text-textcolor underline decoration-dotted"
+              className="text-sm text-linkcolor hover:text-hcolor underline decoration-dotted"
             >
               Forgot password?
             </Link>
@@ -113,7 +135,7 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
             onClick={() => setShowPw((v) => !v)}
             className="
               absolute inset-y-0 right-2 my-auto inline-flex h-8 w-8 items-center justify-center
-              rounded-md text-muted-foreground hover:text-textcolor
+              rounded-md text-muted-foreground hover:text-hcolor
               focus:outline-none focus:ring-2 focus:ring-sidebar-ring
             "
             aria-label={showPw ? "Hide password" : "Show password"}
@@ -150,12 +172,17 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
         )}
       </Button>
 
-      <p className="text-sm text-center text-muted-foreground">
-        No account?{" "}
-        <a href="/register" className="underline decoration-dotted text-linkcolor hover:text-textcolor">
-          Register
-        </a>
-      </p>
+      {/* OAuth Sign-In Buttons */}
+      {showOAuth && <OAuthButtons callbackUrl={callbackUrl} />}
+
+      {showRegisterLink && (
+        <p className="text-sm text-center text-muted-foreground">
+          No account?{" "}
+          <a href="/register" className="underline decoration-dotted text-linkcolor hover:text-hcolor">
+            Register
+          </a>
+        </p>
+      )}
     </form>
   );
 }

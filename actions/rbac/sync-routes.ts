@@ -16,6 +16,22 @@ interface SyncResult {
    }>;
 }
 
+// Routes to exclude from syncing to database
+const EXCLUDED_ROUTES = [
+   "/",
+   "/rbac",
+   "/developer/api-tester",
+   "/forgot",
+   "/forgot/reset",
+   "/unauthorized",
+   "/forgot/verify",
+   "/login",
+   "/register",
+   "/help",
+   "/profile",
+   "/test",
+];
+
 // Generate routes from app directory
 function generateRoutes(): string[] {
    const appDir = path.join(process.cwd(), "app");
@@ -42,14 +58,6 @@ function generateRoutes(): string[] {
 
             const newPrefix = prefix + (routeSegment ? "/" + routeSegment : "");
 
-            // Check if this directory has a page.tsx or page.ts
-            const pageFile = fs
-               .readdirSync(fullPath)
-               .find((f) => f === "page.tsx" || f === "page.ts");
-            if (pageFile) {
-               routes.push(newPrefix || "/");
-            }
-
             // Recursively scan subdirectories
             scanDirectory(fullPath, newPrefix);
          } else if (file === "page.tsx" || file === "page.ts") {
@@ -65,8 +73,10 @@ function generateRoutes(): string[] {
 
    scanDirectory(appDir);
 
-   // Remove duplicates and sort
-   return [...new Set(routes)].sort();
+   // Remove duplicates, filter excluded routes, and sort
+   const uniqueRoutes = [...new Set(routes)];
+   const filteredRoutes = uniqueRoutes.filter(route => !EXCLUDED_ROUTES.includes(route));
+   return filteredRoutes.sort();
 }
 
 // Extract route name from path
@@ -75,12 +85,14 @@ function extractRouteName(routePath: string): string {
 
    if (!cleanPath) return "Home";
 
-   const segments = cleanPath.split("/");
+   const segments = cleanPath.split("/").filter(Boolean);
    let lastSegment = segments[segments.length - 1];
 
-   if (lastSegment.includes("[") && lastSegment.includes("]")) {
+   if (lastSegment && lastSegment.includes("[") && lastSegment.includes("]")) {
       lastSegment = segments[segments.length - 2] || lastSegment;
    }
+
+   if (!lastSegment) return "Home";
 
    return lastSegment
       .split("-")
@@ -92,10 +104,10 @@ export async function syncRoutesToDatabase(): Promise<SyncResult> {
    const session = await auth();
 
    // Only allow DEVELOPER and SUPER_ADMIN
+   const level = (session?.user as any)?.level;
    if (
       !session?.user?.id ||
-      (session.user.level !== "DEVELOPER" &&
-         session.user.level !== "SUPER_ADMIN")
+      (level !== "DEVELOPER" && level !== "SUPER_ADMIN")
    ) {
       return {
          ok: false,
@@ -140,20 +152,26 @@ export async function syncRoutesToDatabase(): Promise<SyncResult> {
       for (const routePath of newRoutes) {
          const routeName = extractRouteName(routePath);
 
-         await prisma.route.create({
-            data: {
-               path: routePath,
-               name: routeName,
-               groupId: routeGroup.id,
-               visibleToAdmin: true,
-               editableByAdmin: true,
-               visibleToSuperAdmin: true,
-               editableBySuperAdmin: true,
-            },
-         });
+         try {
+            await prisma.route.upsert({
+               where: { path: routePath },
+               update: {},
+               create: {
+                  path: routePath,
+                  name: routeName,
+                  groupId: routeGroup.id,
+                  visibleToAdmin: true,
+                  editableByAdmin: false,
+                  visibleToSuperAdmin: true,
+                  editableBySuperAdmin: true,
+               },
+            });
 
-         addedCount++;
-         addedRoutes.push({ path: routePath, name: routeName });
+            addedCount++;
+            addedRoutes.push({ path: routePath, name: routeName });
+         } catch (err) {
+            console.warn(`Failed to sync route ${routePath}:`, err);
+         }
       }
 
       return {
@@ -176,10 +194,10 @@ export async function syncRoutesToDatabase(): Promise<SyncResult> {
 export async function getAllRoutesAndGroups() {
    const session = await auth();
 
+   const level = (session?.user as any)?.level;
    if (
       !session?.user?.id ||
-      (session.user.level !== "DEVELOPER" &&
-         session.user.level !== "SUPER_ADMIN")
+      (level !== "DEVELOPER" && level !== "SUPER_ADMIN")
    ) {
       return {
          ok: false,
