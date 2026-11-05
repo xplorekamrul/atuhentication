@@ -181,10 +181,7 @@ export default function GoogleOneTap({
   const { status } = useSession();
   const [error, setError] = useState<string | null>(null);
 
-  // Disable Google One Tap completely on admin portal routes
-  if (pathname?.startsWith("/admin")) {
-    return null;
-  }
+  const isAdminRoute = Boolean(pathname?.startsWith("/admin"));
 
   // ---- Credential callback (runs when the user picks an account) ----
   const handleCredentialResponse = useCallback(
@@ -238,6 +235,7 @@ export default function GoogleOneTap({
   // ---- Load GIS, initialize and show the prompt ----
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (isAdminRoute) return; // Do not initialize GIS on admin portal routes
     if (status !== "unauthenticated") return; // wait for session, skip if logged in
     if (disabled) return;
 
@@ -335,9 +333,9 @@ export default function GoogleOneTap({
         /* ignore */
       }
     };
-  }, [status, disabled, hideOnOutsideClick, autoHideAfterMs]);
+  }, [isAdminRoute, status, disabled, hideOnOutsideClick, autoHideAfterMs]);
 
-  if (!error) return null;
+  if (isAdminRoute || !error) return null;
 
   return (
     <div className="fixed bottom-20 right-4 z-100 max-w-xs animate-in fade-in slide-in-from-bottom-4 duration-300">
