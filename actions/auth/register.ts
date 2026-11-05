@@ -5,7 +5,7 @@ import { sendWelcomeEmail } from "@/lib/mail";
 import { prisma } from "@/lib/prisma";
 import { actionClient } from "@/lib/safe-action/clients";
 import { registerSchema } from "@/lib/validations/auth";
-import { AdminLevel, UserType } from "@prisma/client";
+import { UserType } from "@prisma/client";
 import { headers } from "next/headers";
 import { getClientIp, incrementRateLimit } from "@/lib/rate-limit";
 
@@ -28,70 +28,33 @@ export const register = actionClient
       };
     }
 
-    // 2. Cross-table collision check (guarantee email and username are unique across BOTH Admin and User tables)
-    const [adminWithEmail, userWithEmail, adminWithUsername, userWithUsername] = await Promise.all([
-      prisma.admin.findUnique({ where: { email: normalizedEmail }, select: { id: true } }),
+    // 2. Uniqueness check on User table only (no queries on Admin table, keeping admin secrets safe)
+    const [userWithEmail, userWithUsername] = await Promise.all([
       prisma.user.findUnique({ where: { email: normalizedEmail }, select: { id: true } }),
-      prisma.admin.findUnique({ where: { username }, select: { id: true } }),
       prisma.user.findUnique({ where: { username }, select: { id: true } }),
     ]);
 
-    if (adminWithEmail || userWithEmail || adminWithUsername || userWithUsername) {
+    if (userWithEmail || userWithUsername) {
       return { ok: false as const, message: ACCOUNT_EXISTS_MESSAGE };
     }
 
-    // Check if email matches admin emails
-    const superAdminEmail = (process.env.SUPERADMIN_EMAIL ?? "").toLowerCase().trim();
-    const developerEmail = (process.env.DEVELOPER_EMAIL ?? "").toLowerCase().trim();
-
-    const isAdmin = normalizedEmail === superAdminEmail || normalizedEmail === developerEmail;
-
     const pwd = await hashPassword(password);
 
-    if (isAdmin) {
-      // Determine admin level based on email
-      let level: AdminLevel = AdminLevel.ADMIN;
-      if (normalizedEmail === superAdminEmail) {
-        level = AdminLevel.SUPER_ADMIN;
-      } else if (normalizedEmail === developerEmail) {
-        level = AdminLevel.DEVELOPER;
-      }
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email: normalizedEmail,
+        username,
+        password: pwd,
+        userType: UserType.USER,
+      },
+      select: { id: true, email: true, name: true, username: true },
+    });
 
-      const admin = await prisma.admin.create({
-        data: {
-          name,
-          email: normalizedEmail,
-          username,
-          password: pwd,
-          level,
-          userType: UserType.ADMIN,
-        },
-        select: { id: true, email: true, level: true, name: true, username: true },
-      });
-
-      // Send welcome email (fire and forget to not block response)
-      if (admin.email) {
-        void sendWelcomeEmail(admin.email, admin.name ?? "Admin");
-      }
-
-      return { ok: true as const, user: admin };
-    } else {
-      const user = await prisma.user.create({
-        data: {
-          name,
-          email: normalizedEmail,
-          username,
-          password: pwd,
-          userType: UserType.USER,
-        },
-        select: { id: true, email: true, name: true, username: true },
-      });
-
-      // Send welcome email (fire and forget to not block response)
-      if (user.email) {
-        void sendWelcomeEmail(user.email, user.name ?? "User");
-      }
-
-      return { ok: true as const, user: { ...user, id: user.id.toString() } };
+    // Send welcome email (fire and forget to not block response)
+    if (user.email) {
+      void sendWelcomeEmail(user.email, user.name ?? "User");
     }
+
+    return { ok: true as const, user: { ...user, id: user.id.toString() } };
   });

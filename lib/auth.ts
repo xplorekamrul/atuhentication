@@ -48,10 +48,13 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
+        loginType: { label: "Login Type", type: "text" },
       },
       async authorize(creds, req) {
         const identifier = (creds?.email ?? "").trim();
         const password = creds?.password ?? "";
+        const loginType = ((creds as any)?.loginType ?? "USER").toString().toUpperCase();
+        const isAdminPortal = loginType === "ADMIN";
 
         if (!identifier || !password) return null;
 
@@ -114,17 +117,61 @@ export const authOptions: NextAuthOptions = {
           }
         };
 
-        // Try admin first
-        const admin = await prisma.admin.findFirst({
-          where: {
-            OR: [
-              { email: identifier.toLowerCase() },
-              { username: identifier },
-            ],
-          },
-        });
+        if (isAdminPortal) {
+          // ==========================================
+          // 1. ADMIN PORTAL LOGIN (/admin/login)
+          // ==========================================
+          let admin = await prisma.admin.findFirst({
+            where: {
+              OR: [
+                { email: identifier.toLowerCase() },
+                { username: identifier },
+              ],
+            },
+          });
 
-        if (admin) {
+          // If admin account doesn't exist yet in database, check if email matches env configuration to auto-create
+          if (!admin) {
+            const superAdminEmail = (process.env.SUPERADMIN_EMAIL ?? "").toLowerCase().trim();
+            const developerEmail = (process.env.DEVELOPER_EMAIL ?? "").toLowerCase().trim();
+            const normalizedIdentifier = identifier.toLowerCase();
+
+            const isDeveloper = !!developerEmail && normalizedIdentifier === developerEmail;
+            const isSuperAdmin = !!superAdminEmail && normalizedIdentifier === superAdminEmail;
+
+            if (isDeveloper || isSuperAdmin) {
+              const level = isDeveloper ? "DEVELOPER" : "SUPER_ADMIN";
+              const baseUsername =
+                normalizedIdentifier.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 30) || "admin";
+
+              let username = baseUsername;
+              let counter = 1;
+              while (await prisma.admin.findUnique({ where: { username }, select: { id: true } })) {
+                username = `${baseUsername}${counter++}`;
+              }
+
+              const hashedPassword = await bcrypt.hash(password, 10);
+
+              admin = await prisma.admin.create({
+                data: {
+                  name: isDeveloper ? "Developer Admin" : "Super Admin",
+                  email: normalizedIdentifier,
+                  username,
+                  password: hashedPassword,
+                  level,
+                  userType: "ADMIN",
+                  status: "ACTIVE",
+                  sessionVersion: 1,
+                },
+              });
+            }
+          }
+
+          if (!admin) {
+            recordFailedAttempt();
+            return null;
+          }
+
           const ok = await bcrypt.compare(password, admin.password);
           if (!ok) {
             recordFailedAttempt();
@@ -132,7 +179,13 @@ export const authOptions: NextAuthOptions = {
           }
 
           // Block suspended or inactive admin
-          if (admin.status !== "ACTIVE") return null;
+          if (admin.status !== "ACTIVE") {
+            throw new Error(
+              admin.status === "SUSPENDED"
+                ? "Your administrative account is suspended. Please contact support."
+                : "Your administrative account is inactive. Please contact support."
+            );
+          }
 
           // Successful login: reset account failed attempts
           resetExponentialLockout(accountLockKey);
@@ -164,67 +217,76 @@ export const authOptions: NextAuthOptions = {
           } as User;
 
           return u;
-        }
-
-        // Try user
-        const user = await prisma.user.findFirst({
-          where: {
-            OR: [
-              { email: identifier.toLowerCase() },
-              { username: identifier },
-            ],
-          },
-        });
-
-        if (!user) {
-          recordFailedAttempt();
-          return null;
-        }
-
-        // User must have a password for credentials login (OAuth-only users won't have one)
-        if (!user.password) {
-          recordFailedAttempt();
-          return null;
-        }
-
-        // Block suspended or inactive user
-        if (user.status !== "ACTIVE") return null;
-
-        const ok = await bcrypt.compare(password, user.password);
-        if (!ok) {
-          recordFailedAttempt();
-          return null;
-        }
-
-        // Successful login: reset account failed attempts
-        resetExponentialLockout(accountLockKey);
-
-        // Log user login history
-        try {
-          let ua = (headers?.["user-agent"] as string) || "Unknown User Agent";
-          if (Array.isArray(ua)) ua = ua[0];
-
-          await recordLoginHistory({
-            userId: user.id,
-            ipAddress: ip,
-            userAgent: ua,
-            maxKeep: 20,
+        } else {
+          // ==========================================
+          // 2. USER LOGIN PAGE (/login - CUSTOMER ONLY)
+          // ==========================================
+          // Strictly query User table only! No admin table queries, zero leakage of admin existence.
+          const user = await prisma.user.findFirst({
+            where: {
+              OR: [
+                { email: identifier.toLowerCase() },
+                { username: identifier },
+              ],
+            },
           });
-        } catch (error) {
-          console.error("Failed to record user login history:", error);
+
+          if (!user) {
+            recordFailedAttempt();
+            return null;
+          }
+
+          // User must have a password for credentials login (OAuth-only users won't have one)
+          if (!user.password) {
+            recordFailedAttempt();
+            return null;
+          }
+
+          // Block suspended or inactive user
+          if (user.status !== "ACTIVE") {
+            throw new Error(
+              user.status === "SUSPENDED"
+                ? "Your account is suspended. Please contact support."
+                : "Your account is inactive. Please contact support."
+            );
+          }
+
+          const ok = await bcrypt.compare(password, user.password);
+          if (!ok) {
+            recordFailedAttempt();
+            return null;
+          }
+
+          // Successful login: reset account failed attempts
+          resetExponentialLockout(accountLockKey);
+
+          // Log user login history
+          try {
+            let ua = (headers?.["user-agent"] as string) || "Unknown User Agent";
+            if (Array.isArray(ua)) ua = ua[0];
+
+            await recordLoginHistory({
+              userId: user.id,
+              ipAddress: ip,
+              userAgent: ua,
+              maxKeep: 20,
+            });
+          } catch (error) {
+            console.error("Failed to record user login history:", error);
+          }
+
+          const u: User = {
+            id: user.id.toString(),
+            name: user.name ?? null,
+            email: user.email,
+            image: user.image,
+            userType: "USER",
+            status: user.status as "ACTIVE" | "INACTIVE" | "SUSPENDED",
+            sessionVersion: user.sessionVersion,
+          } as User;
+
+          return u;
         }
-
-        const u: User = {
-          id: user.id.toString(),
-          name: user.name ?? null,
-          email: user.email,
-          image: user.image,
-          userType: "USER",
-          status: user.status as "ACTIVE" | "INACTIVE" | "SUSPENDED",
-          sessionVersion: user.sessionVersion,
-        } as User;
-
-        return u;
       },
     }),
     // Google OAuth Provider

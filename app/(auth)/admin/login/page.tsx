@@ -23,6 +23,7 @@ export default async function AdminLoginPage({
             callbackUrl={callbackUrl}
             showOAuth={false}
             showRegisterLink={false}
+            isAdminLogin={true}
           />
         </AuthCard>
       </div>

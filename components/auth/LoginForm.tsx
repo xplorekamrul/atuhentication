@@ -13,12 +13,14 @@ interface LoginFormProps {
   callbackUrl?: string;
   showOAuth?: boolean;
   showRegisterLink?: boolean;
+  isAdminLogin?: boolean;
 }
 
 export default function LoginForm({
   callbackUrl = "/dashboard",
   showOAuth = true,
   showRegisterLink = true,
+  isAdminLogin = false,
 }: LoginFormProps) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -44,6 +46,7 @@ export default function LoginForm({
         redirect: false,
         email: form.email,
         password: form.password,
+        loginType: isAdminLogin ? "ADMIN" : "USER",
         callbackUrl,
       });
 
@@ -61,8 +64,9 @@ export default function LoginForm({
         // Get the updated session
         const updatedSession = await fetch("/api/auth/session").then(r => r.json());
 
-        if (updatedSession?.user?.userType === "ADMIN") {
-          router.push("/admin");
+        if (isAdminLogin || updatedSession?.user?.userType === "ADMIN") {
+          const redirectUrl = callbackUrl && callbackUrl !== "/dashboard" ? callbackUrl : "/admin";
+          router.push(redirectUrl);
         } else {
           const redirectUrl = callbackUrl === "/dashboard" ? "/" : callbackUrl;
           router.push(redirectUrl);
@@ -78,7 +82,7 @@ export default function LoginForm({
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-2">
         <label htmlFor="email" className="text-sm font-medium text-foreground">
-          Email or Username
+          {isAdminLogin ? "Admin Email or Username" : "Email or Username"}
         </label>
         <input
           id="email"
@@ -92,7 +96,7 @@ export default function LoginForm({
             text-foreground placeholder:text-muted-foreground
             focus:outline-none focus:ring-2 focus:ring-sidebar-ring
           "
-          placeholder="user@example.com or username"
+          placeholder={isAdminLogin ? "admin@example.com or username" : "user@example.com or username"}
         />
       </div>
 

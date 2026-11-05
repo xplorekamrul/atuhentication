@@ -18,7 +18,7 @@ export default async function Page({
     <main className="min-h-screen bg-light dark:bg-background grid place-items-center px-4">
       <div className="w-full max-w-md">
         <AuthCard title="Welcome back" subtitle="Sign in to continue">
-          <LoginForm callbackUrl={callbackUrl} />
+          <LoginForm callbackUrl={callbackUrl} isAdminLogin={false} />
         </AuthCard>
       </div>
     </main>
