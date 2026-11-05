@@ -92,6 +92,6 @@ export const register = actionClient
         void sendWelcomeEmail(user.email, user.name ?? "User");
       }
 
-      return { ok: true as const, user };
+      return { ok: true as const, user: { ...user, id: user.id.toString() } };
     }
   });

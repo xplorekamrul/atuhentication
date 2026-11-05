@@ -44,7 +44,7 @@ export const updateUserStatus = superAdminActionClient
         },
       });
 
-      return { ok: true as const, user };
+      return { ok: true as const, user: { ...user, id: user.id.toString() } };
     }
 
     // 2. If explicitly ADMIN
@@ -162,7 +162,7 @@ export const updateUserStatus = superAdminActionClient
           },
         });
 
-        return { ok: true as const, user };
+        return { ok: true as const, user: { ...user, id: user.id.toString() } };
       }
     }
 

@@ -42,7 +42,7 @@ export const updateUserInfo = superAdminActionClient
         select: { id: true, name: true, email: true, status: true },
       });
 
-      return { ok: true as const, user };
+      return { ok: true as const, user: { ...user, id: user.id.toString() } };
     }
 
     // 2. If explicitly ADMIN
@@ -152,7 +152,7 @@ export const updateUserInfo = superAdminActionClient
           select: { id: true, name: true, email: true, status: true },
         });
 
-        return { ok: true as const, user };
+        return { ok: true as const, user: { ...user, id: user.id.toString() } };
       }
     }
 
