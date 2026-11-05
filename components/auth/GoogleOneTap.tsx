@@ -1,6 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 // ---------- Google Identity Services type declarations ----------
@@ -176,8 +177,14 @@ export default function GoogleOneTap({
   hideOnOutsideClick = true,
   autoHideAfterMs = 0,
 }: GoogleOneTapProps) {
+  const pathname = usePathname();
   const { status } = useSession();
   const [error, setError] = useState<string | null>(null);
+
+  // Disable Google One Tap completely on admin portal routes
+  if (pathname?.startsWith("/admin")) {
+    return null;
+  }
 
   // ---- Credential callback (runs when the user picks an account) ----
   const handleCredentialResponse = useCallback(

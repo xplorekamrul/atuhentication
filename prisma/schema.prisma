@@ -31,7 +31,7 @@ enum UserType {
  */
 
 model Admin {
-  id             BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  id             String         @id @default(cuid()) @db.VarChar(191)
   name           String?        @db.VarChar(50)
   email          String?        @unique @db.VarChar(50)
   username       String?        @unique @db.VarChar(50)
@@ -57,7 +57,7 @@ model Admin {
 
 model AdminRole {
   id        BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  adminId   BigInt   @map("admin_id") @db.UnsignedBigInt
+  adminId   String   @map("admin_id") @db.VarChar(191)
   roleId    BigInt   @map("role_id") @db.UnsignedBigInt
   createdAt DateTime @default(now()) @map("created_at")
   admin     Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
@@ -155,7 +155,7 @@ model User {
 
 model Profile {
   id      BigInt  @id @default(autoincrement()) @db.UnsignedBigInt
-  adminId BigInt? @unique @map("admin_id") @db.UnsignedBigInt
+  adminId String? @unique @map("admin_id") @db.VarChar(191)
   userId  BigInt? @unique @map("user_id") @db.UnsignedBigInt
   admin   Admin?  @relation("AdminProfile", fields: [adminId], references: [id], onDelete: Cascade)
   user    User?   @relation("UserProfile", fields: [userId], references: [id], onDelete: Cascade)
@@ -176,7 +176,7 @@ model Profile {
 
 model LoginHistory {
   id      BigInt  @id @default(autoincrement()) @db.UnsignedBigInt
-  adminId BigInt? @map("admin_id") @db.UnsignedBigInt
+  adminId String? @map("admin_id") @db.VarChar(191)
   userId  BigInt? @map("user_id") @db.UnsignedBigInt
   admin   Admin?  @relation("AdminLoginHistory", fields: [adminId], references: [id], onDelete: Cascade)
   user    User?   @relation("UserLoginHistory", fields: [userId], references: [id], onDelete: Cascade)

@@ -14,7 +14,7 @@ export function isDeveloperOnlyPage(pathname: string): boolean {
 /**
  * Get all accessible routes for an admin based on their level and roles
  */
-export async function getAdminAccessibleRoutes(adminId: bigint) {
+export async function getAdminAccessibleRoutes(adminId: string) {
    const admin = await prisma.admin.findUnique({
       where: { id: adminId },
       select: {
@@ -74,7 +74,7 @@ export async function getAdminAccessibleRoutes(adminId: bigint) {
 /**
  * Check if an admin can access a specific path
  */
-export async function canAdminAccessPath(adminId: bigint, path: string): Promise<boolean> {
+export async function canAdminAccessPath(adminId: string, path: string): Promise<boolean> {
    const normalizedPath = normalizePath(path);
 
    // Allow /admin base path for all authenticated admins
@@ -160,7 +160,7 @@ export async function canAdminAccessPath(adminId: bigint, path: string): Promise
 /**
  * Check if an admin can edit a specific route
  */
-export async function canAdminEditRoute(adminId: bigint, routePath: string): Promise<boolean> {
+export async function canAdminEditRoute(adminId: string, routePath: string): Promise<boolean> {
    const admin = await prisma.admin.findUnique({
       where: { id: adminId },
       select: {

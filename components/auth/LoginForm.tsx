@@ -9,7 +9,17 @@ import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import OAuthButtons from "./OAuthButtons";
 
-export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?: string }) {
+interface LoginFormProps {
+  callbackUrl?: string;
+  showOAuth?: boolean;
+  showRegisterLink?: boolean;
+}
+
+export default function LoginForm({
+  callbackUrl = "/dashboard",
+  showOAuth = true,
+  showRegisterLink = true,
+}: LoginFormProps) {
   const router = useRouter();
   const { data: session } = useSession();
   const [form, setForm] = useState<LoginValues>({ email: "", password: "" });
@@ -159,14 +169,16 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
       </Button>
 
       {/* OAuth Sign-In Buttons */}
-      <OAuthButtons callbackUrl={callbackUrl} />
+      {showOAuth && <OAuthButtons callbackUrl={callbackUrl} />}
 
-      <p className="text-sm text-center text-muted-foreground">
-        No account?{" "}
-        <a href="/register" className="underline decoration-dotted text-linkcolor hover:text-hcolor">
-          Register
-        </a>
-      </p>
+      {showRegisterLink && (
+        <p className="text-sm text-center text-muted-foreground">
+          No account?{" "}
+          <a href="/register" className="underline decoration-dotted text-linkcolor hover:text-hcolor">
+            Register
+          </a>
+        </p>
+      )}
     </form>
   );
 }

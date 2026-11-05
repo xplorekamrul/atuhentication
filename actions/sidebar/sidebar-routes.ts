@@ -14,7 +14,7 @@ export type SidebarRoute = {
 export async function getRoutesWithPermissions() {
    // Get admin info OUTSIDE of cache scope
    const session = await auth();
-   const adminId = session?.user?.id ? BigInt(session.user.id) : null;
+   const adminId = session?.user?.id ? session.user.id : null;
    const adminLevel = (session?.user as any)?.level as string | undefined;
 
    // Get admin accessible groups OUTSIDE of cache scope

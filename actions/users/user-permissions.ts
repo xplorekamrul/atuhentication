@@ -26,7 +26,7 @@ export async function getAccessibleRoutes() {
          return null;
       }
 
-      const adminId = BigInt(session.user.id);
+      const adminId = session.user.id;
       const admin = await prisma.admin.findUnique({
          where: { id: adminId },
          select: {

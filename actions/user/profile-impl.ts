@@ -35,35 +35,34 @@ export const updateProfile = actionClient
     }
 
     const userType = session.user.userType;
-    const userId = BigInt(session.user.id);
     const { name, email, username, image } = parsedInput;
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Check collision across BOTH Admin and User tables for other accounts
-    const [adminCollision, userCollision] = await Promise.all([
-      prisma.admin.findFirst({
-        where: {
-          OR: [{ email: normalizedEmail }, { username }],
-          NOT: userType === "ADMIN" ? { id: userId } : undefined,
-        },
-        select: { id: true },
-      }),
-      prisma.user.findFirst({
-        where: {
-          OR: [{ email: normalizedEmail }, { username }],
-          NOT: userType !== "ADMIN" ? { id: userId } : undefined,
-        },
-        select: { id: true },
-      }),
-    ]);
-
-    if (adminCollision || userCollision) {
-      return { ok: false as const, message: "Email or username already in use by another account." };
-    }
-
     if (userType === "ADMIN") {
+      const adminId = session.user.id;
+      // Check collision across BOTH Admin and User tables for other accounts
+      const [adminCollision, userCollision] = await Promise.all([
+        prisma.admin.findFirst({
+          where: {
+            OR: [{ email: normalizedEmail }, { username }],
+            NOT: { id: adminId },
+          },
+          select: { id: true },
+        }),
+        prisma.user.findFirst({
+          where: {
+            OR: [{ email: normalizedEmail }, { username }],
+          },
+          select: { id: true },
+        }),
+      ]);
+
+      if (adminCollision || userCollision) {
+        return { ok: false as const, message: "Email or username already in use by another account." };
+      }
+
       await prisma.admin.update({
-        where: { id: userId },
+        where: { id: adminId },
         data: {
           name,
           email: normalizedEmail,
@@ -72,8 +71,30 @@ export const updateProfile = actionClient
         },
       });
     } else {
+      const userBigIntId = BigInt(session.user.id);
+      // Check collision across BOTH Admin and User tables for other accounts
+      const [adminCollision, userCollision] = await Promise.all([
+        prisma.admin.findFirst({
+          where: {
+            OR: [{ email: normalizedEmail }, { username }],
+          },
+          select: { id: true },
+        }),
+        prisma.user.findFirst({
+          where: {
+            OR: [{ email: normalizedEmail }, { username }],
+            NOT: { id: userBigIntId },
+          },
+          select: { id: true },
+        }),
+      ]);
+
+      if (adminCollision || userCollision) {
+        return { ok: false as const, message: "Email or username already in use by another account." };
+      }
+
       await prisma.user.update({
-        where: { id: userId },
+        where: { id: userBigIntId },
         data: {
           name,
           email: normalizedEmail,
@@ -96,12 +117,12 @@ export const changePassword = actionClient
     }
 
     const userType = session.user.userType;
-    const userId = BigInt(session.user.id);
     const { oldPassword, newPassword } = parsedInput;
 
     if (userType === "ADMIN") {
+      const adminId = session.user.id;
       const admin = await prisma.admin.findUnique({
-        where: { id: userId },
+        where: { id: adminId },
       });
 
       if (!admin) {
@@ -116,7 +137,7 @@ export const changePassword = actionClient
       const hashedPassword = await hashPassword(newPassword);
 
       await prisma.admin.update({
-        where: { id: userId },
+        where: { id: adminId },
         data: { password: hashedPassword, sessionVersion: { increment: 1 } },
       });
 
@@ -127,8 +148,9 @@ export const changePassword = actionClient
       revalidatePath("/profile");
       return { ok: true as const, message: "Password changed successfully" };
     } else {
+      const userBigIntId = BigInt(session.user.id);
       const user = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { id: userBigIntId },
       });
 
       if (!user) {
@@ -150,7 +172,7 @@ export const changePassword = actionClient
       const hashedPassword = await hashPassword(newPassword);
 
       await prisma.user.update({
-        where: { id: userId },
+        where: { id: userBigIntId },
         data: { password: hashedPassword, sessionVersion: { increment: 1 } },
       });
 

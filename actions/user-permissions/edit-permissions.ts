@@ -21,7 +21,7 @@ export async function getEditPermissionForRoute(routePath: string) {
          return false;
       }
 
-      const adminId = BigInt(session.user.id);
+      const adminId = session.user.id;
       const admin = await prisma.admin.findUnique({
          where: { id: adminId },
          select: {
@@ -120,7 +120,7 @@ export async function getUserEditPermissions() {
          return new Map<string, boolean>();
       }
 
-      const adminId = BigInt(session.user.id);
+      const adminId = session.user.id;
       const admin = await prisma.admin.findUnique({
          where: { id: adminId },
          select: {

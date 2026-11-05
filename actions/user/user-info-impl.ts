@@ -24,7 +24,6 @@ export const upsertUserInfo = actionClient
     }
 
     const userType = session.user.userType;
-    const userId = BigInt(session.user.id);
 
     const data = {
       dateOfBirth: parsedInput.dateOfBirth ? new Date(parsedInput.dateOfBirth) : null,
@@ -36,20 +35,22 @@ export const upsertUserInfo = actionClient
     };
 
     if (userType === "ADMIN") {
+      const adminId = session.user.id;
       await prisma.profile.upsert({
-        where: { adminId: userId },
+        where: { adminId },
         update: data,
         create: {
-          adminId: userId,
+          adminId,
           ...data,
         },
       });
     } else {
+      const userBigIntId = BigInt(session.user.id);
       await prisma.profile.upsert({
-        where: { userId },
+        where: { userId: userBigIntId },
         update: data,
         create: {
-          userId,
+          userId: userBigIntId,
           ...data,
         },
       });

@@ -13,14 +13,13 @@ export default async function ProfilePage() {
    }
 
    const userType = (session?.user as any)?.userType as string | undefined;
-   const userId = BigInt(session.user.id);
 
    let user: any = null;
 
    // Fetch from appropriate table based on user type
    if (userType === "ADMIN") {
       user = await prisma.admin.findUnique({
-         where: { id: userId },
+         where: { id: session.user.id },
          select: {
             name: true,
             email: true,
@@ -34,6 +33,7 @@ export default async function ProfilePage() {
          },
       });
    } else {
+      const userId = BigInt(session.user.id);
       user = await prisma.user.findUnique({
          where: { id: userId },
          select: {

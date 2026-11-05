@@ -13,8 +13,9 @@ export const updateUserInfo = superAdminActionClient
 
     // 1. If explicitly USER
     if (userType === "USER") {
+      const userBigIntId = BigInt(id);
       const targetUser = await prisma.user.findUnique({
-        where: { id },
+        where: { id: userBigIntId },
         select: { id: true },
       });
 
@@ -26,7 +27,7 @@ export const updateUserInfo = superAdminActionClient
           select: { id: true },
         }),
         prisma.user.findFirst({
-          where: { email: normalizedEmail, NOT: { id } },
+          where: { email: normalizedEmail, NOT: { id: userBigIntId } },
           select: { id: true },
         }),
       ]);
@@ -36,7 +37,7 @@ export const updateUserInfo = superAdminActionClient
       }
 
       const user = await prisma.user.update({
-        where: { id },
+        where: { id: userBigIntId },
         data: { name, email: normalizedEmail },
         select: { id: true, name: true, email: true, status: true },
       });
@@ -122,34 +123,37 @@ export const updateUserInfo = superAdminActionClient
       return { ok: true as const, user: admin };
     }
 
-    const targetUser = await prisma.user.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-
-    if (targetUser) {
-      const [adminEmailUsed, userEmailUsed] = await Promise.all([
-        prisma.admin.findFirst({
-          where: { email: normalizedEmail },
-          select: { id: true },
-        }),
-        prisma.user.findFirst({
-          where: { email: normalizedEmail, NOT: { id } },
-          select: { id: true },
-        }),
-      ]);
-
-      if (adminEmailUsed || userEmailUsed) {
-        return { ok: false as const, message: "Email already in use by another account." };
-      }
-
-      const user = await prisma.user.update({
-        where: { id },
-        data: { name, email: normalizedEmail },
-        select: { id: true, name: true, email: true, status: true },
+    if (/^\d+$/.test(id)) {
+      const userBigIntId = BigInt(id);
+      const targetUser = await prisma.user.findUnique({
+        where: { id: userBigIntId },
+        select: { id: true },
       });
 
-      return { ok: true as const, user };
+      if (targetUser) {
+        const [adminEmailUsed, userEmailUsed] = await Promise.all([
+          prisma.admin.findFirst({
+            where: { email: normalizedEmail },
+            select: { id: true },
+          }),
+          prisma.user.findFirst({
+            where: { email: normalizedEmail, NOT: { id: userBigIntId } },
+            select: { id: true },
+          }),
+        ]);
+
+        if (adminEmailUsed || userEmailUsed) {
+          return { ok: false as const, message: "Email already in use by another account." };
+        }
+
+        const user = await prisma.user.update({
+          where: { id: userBigIntId },
+          data: { name, email: normalizedEmail },
+          select: { id: true, name: true, email: true, status: true },
+        });
+
+        return { ok: true as const, user };
+      }
     }
 
     return { ok: false as const, message: "Account not found." };

@@ -13,14 +13,15 @@ export const deleteUser = superAdminActionClient
 
     // 1. If explicitly USER
     if (userType === "USER") {
+      const userBigIntId = BigInt(id);
       const targetUser = await prisma.user.findUnique({
-        where: { id },
+        where: { id: userBigIntId },
         select: { id: true, email: true },
       });
 
       if (!targetUser) return { ok: false as const, message: "User not found." };
 
-      await prisma.user.delete({ where: { id } });
+      await prisma.user.delete({ where: { id: userBigIntId } });
 
       if (targetUser.email) {
         resetExponentialLockout(`exp:account:${targetUser.email.toLowerCase().trim()}`);
@@ -77,19 +78,22 @@ export const deleteUser = superAdminActionClient
       return { ok: true as const };
     }
 
-    const targetUser = await prisma.user.findUnique({
-      where: { id },
-      select: { id: true, email: true },
-    });
+    if (/^\d+$/.test(id)) {
+      const userBigIntId = BigInt(id);
+      const targetUser = await prisma.user.findUnique({
+        where: { id: userBigIntId },
+        select: { id: true, email: true },
+      });
 
-    if (targetUser) {
-      await prisma.user.delete({ where: { id } });
+      if (targetUser) {
+        await prisma.user.delete({ where: { id: userBigIntId } });
 
-      if (targetUser.email) {
-        resetExponentialLockout(`exp:account:${targetUser.email.toLowerCase().trim()}`);
+        if (targetUser.email) {
+          resetExponentialLockout(`exp:account:${targetUser.email.toLowerCase().trim()}`);
+        }
+
+        return { ok: true as const };
       }
-
-      return { ok: true as const };
     }
 
     return { ok: false as const, message: "Account not found." };

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
 export interface RecordLoginHistoryParams {
-  adminId?: bigint | null;
+  adminId?: string | null;
   userId?: bigint | null;
   ipAddress?: string | null;
   userAgent?: string | null;
@@ -59,4 +59,3 @@ export async function recordLoginHistory({
     console.error("Failed to clean up old login history:", cleanupError);
   }
 }
-

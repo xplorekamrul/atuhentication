@@ -102,35 +102,10 @@ export async function POST(req: NextRequest) {
     };
 
     if (admin) {
-      if (admin.status === "SUSPENDED") {
-        return NextResponse.json(
-          { ok: false, message: "This administrator account is suspended." },
-          { status: 403 }
-        );
-      }
-
-      // Record admin login history (keeping only last 20)
-      try {
-        await recordLoginHistory({
-          adminId: admin.id,
-          ipAddress: ip,
-          userAgent,
-          maxKeep: 20,
-        });
-      } catch (logErr) {
-        console.error("[GoogleOneTap API] Failed to log admin history:", logErr);
-      }
-
-      userRecord = {
-        id: admin.id.toString(),
-        name: admin.name ?? null,
-        email: admin.email ?? email,
-        image: admin.image,
-        userType: "ADMIN",
-        level: admin.level as "ADMIN" | "SUPER_ADMIN" | "DEVELOPER",
-        status: admin.status as "ACTIVE" | "INACTIVE" | "SUSPENDED",
-        sessionVersion: admin.sessionVersion,
-      };
+      return NextResponse.json(
+        { ok: false, message: "OAuth sign-in is not permitted for admin accounts. Please use credential login." },
+        { status: 403 }
+      );
     } else {
       // 3. Regular User: check if user exists, auto-register if new
       let user = await prisma.user.findUnique({

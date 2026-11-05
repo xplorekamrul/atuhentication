@@ -13,8 +13,9 @@ export const updateUserStatus = superAdminActionClient
 
     // 1. If explicitly USER
     if (userType === "USER") {
+      const userBigIntId = BigInt(id);
       const targetUser = await prisma.user.findUnique({
-        where: { id },
+        where: { id: userBigIntId },
         select: { id: true, email: true, name: true },
       });
 
@@ -32,7 +33,7 @@ export const updateUserStatus = superAdminActionClient
           };
 
       const user = await prisma.user.update({
-        where: { id },
+        where: { id: userBigIntId },
         data,
         select: {
           id: true,
@@ -130,36 +131,39 @@ export const updateUserStatus = superAdminActionClient
       return { ok: true as const, user: admin };
     }
 
-    const targetUser = await prisma.user.findUnique({
-      where: { id },
-      select: { id: true, email: true, name: true },
-    });
-
-    if (targetUser) {
-      const data: Prisma.UserUpdateInput = isDeactivated
-        ? {
-            status: status as $Enums.AccountStatus,
-            suspendedAt: status === "SUSPENDED" ? new Date() : null,
-            sessionVersion: { increment: 1 },
-          }
-        : {
-            status: status as $Enums.AccountStatus,
-            suspendedAt: null,
-          };
-
-      const user = await prisma.user.update({
-        where: { id },
-        data,
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          status: true,
-          suspendedAt: true,
-        },
+    if (/^\d+$/.test(id)) {
+      const userBigIntId = BigInt(id);
+      const targetUser = await prisma.user.findUnique({
+        where: { id: userBigIntId },
+        select: { id: true, email: true, name: true },
       });
 
-      return { ok: true as const, user };
+      if (targetUser) {
+        const data: Prisma.UserUpdateInput = isDeactivated
+          ? {
+              status: status as $Enums.AccountStatus,
+              suspendedAt: status === "SUSPENDED" ? new Date() : null,
+              sessionVersion: { increment: 1 },
+            }
+          : {
+              status: status as $Enums.AccountStatus,
+              suspendedAt: null,
+            };
+
+        const user = await prisma.user.update({
+          where: { id: userBigIntId },
+          data,
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            status: true,
+            suspendedAt: true,
+          },
+        });
+
+        return { ok: true as const, user };
+      }
     }
 
     return { ok: false as const, message: "Account not found." };

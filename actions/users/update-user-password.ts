@@ -15,15 +15,16 @@ export const updateUserPassword = superAdminActionClient
 
     // 1. If explicitly USER
     if (userType === "USER") {
+      const userBigIntId = BigInt(id);
       const targetUser = await prisma.user.findUnique({
-        where: { id },
+        where: { id: userBigIntId },
         select: { id: true, email: true },
       });
 
       if (!targetUser) return { ok: false as const, message: "User not found." };
 
       await prisma.user.update({
-        where: { id },
+        where: { id: userBigIntId },
         data: { password: pwd, sessionVersion: { increment: 1 } },
         select: { id: true },
       });
@@ -91,23 +92,26 @@ export const updateUserPassword = superAdminActionClient
       return { ok: true as const };
     }
 
-    const targetUser = await prisma.user.findUnique({
-      where: { id },
-      select: { id: true, email: true },
-    });
-
-    if (targetUser) {
-      await prisma.user.update({
-        where: { id },
-        data: { password: pwd, sessionVersion: { increment: 1 } },
-        select: { id: true },
+    if (/^\d+$/.test(id)) {
+      const userBigIntId = BigInt(id);
+      const targetUser = await prisma.user.findUnique({
+        where: { id: userBigIntId },
+        select: { id: true, email: true },
       });
 
-      if (targetUser.email) {
-        resetExponentialLockout(`exp:account:${targetUser.email.toLowerCase().trim()}`);
-      }
+      if (targetUser) {
+        await prisma.user.update({
+          where: { id: userBigIntId },
+          data: { password: pwd, sessionVersion: { increment: 1 } },
+          select: { id: true },
+        });
 
-      return { ok: true as const };
+        if (targetUser.email) {
+          resetExponentialLockout(`exp:account:${targetUser.email.toLowerCase().trim()}`);
+        }
+
+        return { ok: true as const };
+      }
     }
 
     return { ok: false as const, message: "Account not found." };

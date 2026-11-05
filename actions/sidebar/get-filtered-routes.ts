@@ -28,7 +28,7 @@ export type FilteredRoutesResult = {
  * Visibility controls sidebar display.
  * Editability controls what actions can be performed (checked in proxy/permissions).
  */
-export async function getAccessibleRoutePaths(adminId: bigint, level: string): Promise<string[]> {
+export async function getAccessibleRoutePaths(adminId: string, level: string): Promise<string[]> {
    // DEVELOPER has full access
    if (level === 'DEVELOPER') {
       return []; // Empty array means full access
@@ -141,7 +141,7 @@ export async function getFilteredSidebarRoutes(
       // For ADMIN: check if user has any roles assigned
       if (level === 'ADMIN') {
          const admin = await prisma.admin.findUnique({
-            where: { id: BigInt(session.user.id) },
+            where: { id: session.user.id },
             select: { adminRoles: { select: { roleId: true } } },
          });
 
@@ -152,7 +152,7 @@ export async function getFilteredSidebarRoutes(
       }
 
       // Get accessible routes for SUPER_ADMIN and ADMIN
-      const adminId = BigInt(session.user.id);
+      const adminId = session.user.id;
       const accessibleRoutes = await getAccessibleRoutePaths(adminId, level);
 
       console.log('[getFilteredSidebarRoutes] Accessible routes:', accessibleRoutes);

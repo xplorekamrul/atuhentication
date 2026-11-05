@@ -24,14 +24,14 @@ export const createUserSchema = z.object({
 });
 
 export const updateUserInfoSchema = z.object({
-  id: z.string().transform((val) => BigInt(val)),
+  id: z.string().min(1),
   userType: userTypeEnum.optional(),
   name: z.string().min(2).max(80),
   email: z.string().email().toLowerCase(),
 });
 
 export const updateUserPasswordSchema = z.object({
-  id: z.string().transform((val) => BigInt(val)),
+  id: z.string().min(1),
   userType: userTypeEnum.optional(),
   password: z.string().min(6),
   confirm: z.string().min(6),
@@ -41,12 +41,12 @@ export const updateUserPasswordSchema = z.object({
 });
 
 export const updateUserStatusSchema = z.object({
-  id: z.string().transform((val) => BigInt(val)),
+  id: z.string().min(1),
   userType: userTypeEnum.optional(),
   status: statusEnum,
 });
 
 export const deleteUserSchema = z.object({
-  id: z.string().transform((val) => BigInt(val)),
+  id: z.string().min(1),
   userType: userTypeEnum.optional(),
 });

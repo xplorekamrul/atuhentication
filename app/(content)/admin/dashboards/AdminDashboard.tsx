@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 
 export default async function AdminDashboard() {
    const session = await auth();
-   const adminId = session?.user?.id ? BigInt(session.user.id) : null;
+   const adminId = session?.user?.id ? session.user.id : null;
 
    // Get admin's assigned roles
    const adminRoles = adminId
@@ -72,7 +72,7 @@ export default async function AdminDashboard() {
                <h2 className="text-lg font-semibold mb-4">Your Assigned Roles</h2>
                <div className="space-y-3">
                   {roles.map((role) => (
-                     <div key={role.id} className="p-4 border rounded-lg">
+                     <div key={role.id.toString()} className="p-4 border rounded-lg">
                         <h3 className="font-medium">{role.name}</h3>
                         <p className="text-sm text-muted-foreground mt-1">
                            {role.roleRouteGroups.length} route group{role.roleRouteGroups.length !== 1 ? "s" : ""} assigned

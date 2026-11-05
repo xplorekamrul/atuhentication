@@ -153,7 +153,7 @@ export const authOptions: NextAuthOptions = {
           }
 
           const u: User = {
-            id: admin.id.toString(),
+            id: admin.id,
             name: admin.name ?? null,
             email: admin.email,
             image: admin.image,
@@ -251,35 +251,14 @@ export const authOptions: NextAuthOptions = {
         const email = user.email.toLowerCase().trim();
 
         // Check if user is an existing Admin
+        // OAuth is strictly forbidden for Admin accounts: admins must only use the credential form
         const admin = await prisma.admin.findUnique({
           where: { email },
         });
 
         if (admin) {
-          if (admin.status !== "ACTIVE") return false;
-
-          user.id = admin.id.toString();
-          user.userType = "ADMIN";
-          user.level = admin.level as "ADMIN" | "SUPER_ADMIN" | "DEVELOPER";
-          user.status = admin.status as "ACTIVE" | "INACTIVE" | "SUSPENDED";
-          user.sessionVersion = admin.sessionVersion;
-
-          // Record OAuth login history for admin
-          try {
-            const headerList = await headers();
-            const ip = getClientIp(headerList);
-            const ua = headerList.get("user-agent") || "Unknown User Agent";
-            await recordLoginHistory({
-              adminId: admin.id,
-              ipAddress: ip,
-              userAgent: ua,
-              maxKeep: 20,
-            });
-          } catch (error) {
-            console.error("Failed to record admin OAuth login history:", error);
-          }
-
-          return true;
+          console.warn(`[OAuth signIn] Blocked OAuth login attempt for admin email: ${email}`);
+          return false;
         }
 
         // Regular User flow
@@ -397,12 +376,10 @@ export const authOptions: NextAuthOptions = {
 
       // Subsequent requests: validate sessionVersion and status against DB
       if (token.id) {
-        const parsedId = safeParseBigInt(token.id);
-        if (!parsedId) return null as any;
-
         if (token.userType === "ADMIN") {
+          const adminId = String(token.id);
           const admin = await prisma.admin.findUnique({
-            where: { id: parsedId },
+            where: { id: adminId },
             select: { id: true, level: true, status: true, name: true, image: true, sessionVersion: true },
           });
 
@@ -412,7 +389,7 @@ export const authOptions: NextAuthOptions = {
           // Session version mismatch -> force logout all active sessions
           if (token.sessionVersion !== admin.sessionVersion) return null as any;
 
-          token.id = admin.id.toString();
+          token.id = admin.id;
           token.userType = "ADMIN";
           token.level = admin.level;
           token.status = admin.status;
@@ -420,6 +397,9 @@ export const authOptions: NextAuthOptions = {
           token.sessionVersion = admin.sessionVersion;
           return token;
         }
+
+        const parsedId = safeParseBigInt(token.id);
+        if (!parsedId) return null as any;
 
         const dbUser = await prisma.user.findUnique({
           where: { id: parsedId },

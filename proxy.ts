@@ -21,6 +21,7 @@ export async function proxy(req: NextRequest) {
     "/forgot",
     "/register",
     "/login",
+    "/admin/login",
     "/",
   ];
 
@@ -35,7 +36,7 @@ export async function proxy(req: NextRequest) {
     const session = await auth();
     const userType = (session?.user as any)?.userType as string | undefined;
     const level = (session?.user as any)?.level as string | undefined;
-    const userId = session?.user?.id ? BigInt(session.user.id) : null;
+    const userId = session?.user?.id ?? null;
 
     // console.log('[proxy] Session user:', session?.user?.email, 'userType:', userType, 'level:', level);
 
@@ -58,7 +59,7 @@ export async function proxy(req: NextRequest) {
     };
 
     // Handle login pages
-    if (pathname === "/login") {
+    if (pathname === "/login" || pathname === "/admin/login") {
       if (session?.user) {
         // If admin, redirect to /admin, otherwise to home
         if (userType === "ADMIN") {
@@ -99,7 +100,7 @@ export async function proxy(req: NextRequest) {
     if (pathname.startsWith("/admin")) {
       // All admin routes require authentication
       if (!session?.user) {
-        return requireLogin();
+        return requireLogin("/admin/login");
       }
 
       // Only admins can access /admin routes
