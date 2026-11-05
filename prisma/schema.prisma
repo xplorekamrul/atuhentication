@@ -31,7 +31,7 @@ enum UserType {
  */
 
 model Admin {
-  id             String         @id @default(cuid()) @db.VarChar(191)
+  id             String         @id @default(cuid()) @db.VarChar(30)
   name           String?        @db.VarChar(50)
   email          String?        @unique @db.VarChar(50)
   username       String?        @unique @db.VarChar(50)
