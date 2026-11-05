@@ -9,6 +9,7 @@ import EditInfoDialog from "./dialogs/EditInfoDialog";
 import EditPasswordDialog from "./dialogs/EditPasswordDialog";
 import { DeleteConfirmDialog } from "@/components/shared/DeleteConfirmDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { toast } from "sonner";
 
 type Role = "DEVELOPER" | "SUPER_ADMIN" | "ADMIN";
 type Status = "ACTIVE" | "INACTIVE" | "SUSPENDED";
@@ -40,7 +41,12 @@ export default function UserRowActions({ user, onChanged, disabled: disabledProp
     if (disabled) return;
     setOpenMenu(false);
     const res = await doStatus({ id: user.id, userType: user.userType, status });
-    if (res?.data?.ok) onChanged();
+    if (res?.data?.ok) {
+      toast.success(res.data.message || `User status updated to ${status.toLowerCase()}`);
+      onChanged();
+    } else {
+      toast.error(res?.data?.message || res?.serverError || "Failed to update user status");
+    }
   }
 
   const statusOptions = useMemo((): { key: Status; label: string; icon: ReactNode; className: string }[] => {
@@ -128,7 +134,12 @@ export default function UserRowActions({ user, onChanged, disabled: disabledProp
               description={`Are you sure you want to delete user "${user.name || user.email}"? This action cannot be undone.`}
               onConfirm={async () => {
                 const res = await doDelete({ id: user.id, userType: user.userType });
-                if (res?.data?.ok) onChanged();
+                if (res?.data?.ok) {
+                  toast.success(res.data.message || "User deleted successfully");
+                  onChanged();
+                } else {
+                  toast.error(res?.data?.message || res?.serverError || "Failed to delete user");
+                }
               }}
             >
               Delete User

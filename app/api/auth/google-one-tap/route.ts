@@ -122,7 +122,10 @@ export async function POST(req: NextRequest) {
 
         let username = baseUsername;
         let counter = 1;
-        while (await prisma.user.findUnique({ where: { username } })) {
+        while (
+          (await prisma.user.findUnique({ where: { username }, select: { id: true } })) ||
+          (await prisma.admin.findUnique({ where: { username }, select: { id: true } }))
+        ) {
           username = `${baseUsername}${counter++}`;
         }
 
@@ -138,9 +141,15 @@ export async function POST(req: NextRequest) {
           },
         });
       } else {
-        if (user.status === "SUSPENDED") {
+        if (user.status !== "ACTIVE") {
           return NextResponse.json(
-            { ok: false, message: "Your account is suspended. Please contact support." },
+            {
+              ok: false,
+              message:
+                user.status === "SUSPENDED"
+                  ? "Your account is suspended. Please contact support."
+                  : "Your account is inactive. Please contact support.",
+            },
             { status: 403 }
           );
         }

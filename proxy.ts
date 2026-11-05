@@ -11,7 +11,7 @@ export async function proxy(req: NextRequest) {
   const url = req.nextUrl.clone();
   const pathname = url.pathname;
 
-  // Public routes – no auth required
+  // Public routes – no auth required (login pages handled below with auth redirect)
   const publicPrefixes = [
     "/api/auth",
     "/favicon.ico",
@@ -20,8 +20,6 @@ export async function proxy(req: NextRequest) {
     "/public",
     "/forgot",
     "/register",
-    "/login",
-    "/admin/login",
     "/",
   ];
 
