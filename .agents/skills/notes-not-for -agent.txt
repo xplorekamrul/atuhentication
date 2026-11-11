@@ -1,0 +1,11 @@
+src\app\(default)\profile\page.tsx
+
+see this page fronted and backend how pull the data using serveraction and query base insted of using api route it more than faster right . also see how to use caching , chachetag, ralvaidation , suspences and server side page load without use clinet use . compoistion the clinet componet and others things . 
+
+after that see the prisma models prisma\schema.prisma  carefully you  you can see 80% relations are using profileid instead of user id that my goal so use that dont need to update anything the models if need you update the codebase but not change the database ok 
+
+then you see this /mdfiles/MATCHES_LIFECYCLE.md file all of the logics carefully . this process i use in my last verison of this porject that now i want to migrate like you can see old system are use userid for all relations but now i use profile id right . also last time i use api routes and now i use server action and queries right . so dont create any api route use the logic and create server actions and queries ok . also create the forntend pages and the composite component files . 
+
+so start making this comprehensive matching page . create a good looking an userfrinedly responsive ui follow the /THEME.md file color plate .
+
+make sure the pages loding time are 1 sec only dont follow the bad practice write best practice code ok . 

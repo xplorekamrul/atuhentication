@@ -1,0 +1,16 @@
+{
+   "name": "caching-system",
+   "displayName": "Caching System",
+   "version": "1.0.0",
+   "description": "Next.js Cache Components and Partial Prerendering (PPR) caching strategies",
+   "keywords": [
+      "caching",
+      "cache-components",
+      "ppr",
+      "partial-prerendering",
+      "next.js",
+      "performance"
+   ],
+   "author": "Rareviewit Team",
+   "type": "skill"
+}
