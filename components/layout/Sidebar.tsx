@@ -263,8 +263,8 @@ export default function Sidebar({
               collapsed ? "opacity-0 pointer-events-none" : "opacity-100"
             )}
           >
-            <div className="w-28 mx-auto">
-              <img src="/whiteLogo.png" alt="Logo" />
+            <div className="w-20 mx-auto">
+              <img src="/miko-logo.png" alt="Logo" />
             </div>
           </div>
           <Button

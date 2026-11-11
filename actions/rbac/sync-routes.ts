@@ -32,13 +32,7 @@ const EXCLUDED_ROUTES = [
    "/forgot/verify",
    "/login",
    "/register",
-   "/dashboard",
-   "/workspace",
-   "/orders",
-   "/billing",
-   "/help",
-   "/profile",
-   "/test",
+   
 ];
 
 // Generate routes from app directory
