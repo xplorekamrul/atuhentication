@@ -1,9 +1,11 @@
 "use server";
 
 import { serializeBigInt, toBigIntOrNull } from "@/lib/bigint-utils";
+import { invalidateAdminPermissionsCache } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/prisma";
 import { developerActionClient } from "@/lib/safe-action/clients";
 import { roleRouteGroupAssignSchema } from "@/lib/validations/rbac";
+import { z } from "zod";
 
 export const assignRouteGroupsToRole = developerActionClient
    .inputSchema(roleRouteGroupAssignSchema)
@@ -65,13 +67,16 @@ export const assignRouteGroupsToRole = developerActionClient
          },
       });
 
+      // Clear Layer 1 (proxy memory cache) & Layer 2 (Next.js cache tags) for all admins assigned to this role
+      await invalidateAdminPermissionsCache();
+
       return { ok: true as const, data: serializeBigInt(assignments) };
    });
 
 export const getRoleRouteGroups = developerActionClient
    .inputSchema(
-      require("zod").object({
-         roleId: require("zod").string(),
+      z.object({
+         roleId: z.string(),
       })
    )
    .action(async ({ parsedInput }) => {

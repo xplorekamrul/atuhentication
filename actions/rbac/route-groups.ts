@@ -1,6 +1,8 @@
 "use server";
 
 import { serializeBigInt, toBigIntOrNull } from "@/lib/bigint-utils";
+import { invalidateAdminPermissionsCache } from "@/lib/permissions/permissions";
+import { getCachedRouteGroupsList } from "@/lib/permissions/rbac-cache";
 import { prisma } from "@/lib/prisma";
 import { developerActionClient } from "@/lib/safe-action/clients";
 import {
@@ -9,42 +11,12 @@ import {
    routeGroupListSchema,
    routeGroupUpdateSchema,
 } from "@/lib/validations/rbac";
-import { Prisma } from "@prisma/client";
 
 export const listRouteGroups = developerActionClient
    .inputSchema(routeGroupListSchema)
    .action(async ({ parsedInput }) => {
       const { page, pageSize, q } = parsedInput;
-
-      const where: Prisma.RouteGroupWhereInput = q
-         ? { name: { contains: q } }
-         : {};
-
-      const [items, total] = await Promise.all([
-         prisma.routeGroup.findMany({
-            where,
-            orderBy: { name: "asc" },
-            skip: (page - 1) * pageSize,
-            take: pageSize,
-            select: {
-               id: true,
-               name: true,
-               createdAt: true,
-               _count: {
-                  select: { routes: true, roleRouteGroups: true },
-               },
-            },
-         }),
-         prisma.routeGroup.count({ where }),
-      ]);
-
-      return {
-         ok: true as const,
-         items: serializeBigInt(items),
-         total,
-         page,
-         pageSize,
-      };
+      return getCachedRouteGroupsList(page, pageSize, q ?? "");
    });
 
 export const createRouteGroup = developerActionClient
@@ -65,6 +37,8 @@ export const createRouteGroup = developerActionClient
          data: { name },
          select: { id: true, name: true, createdAt: true },
       });
+
+      await invalidateAdminPermissionsCache();
 
       return { ok: true as const, data: serializeBigInt(group) };
    });
@@ -104,6 +78,8 @@ export const updateRouteGroup = developerActionClient
          select: { id: true, name: true, createdAt: true },
       });
 
+      await invalidateAdminPermissionsCache();
+
       return { ok: true as const, data: serializeBigInt(updated) };
    });
 
@@ -132,6 +108,8 @@ export const deleteRouteGroup = developerActionClient
       await prisma.routeGroup.delete({
          where: { id: groupId },
       });
+
+      await invalidateAdminPermissionsCache();
 
       return { ok: true as const };
    });

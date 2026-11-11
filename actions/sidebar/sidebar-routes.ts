@@ -1,5 +1,7 @@
 import { auth } from '@/lib/auth';
+import { getCachedAdminAccessiblePaths } from '@/lib/permissions/permissions';
 import { prisma } from '@/lib/prisma';
+import { cacheLife, cacheTag } from 'next/cache';
 
 export type SidebarRoute = {
    path: string;
@@ -7,47 +9,13 @@ export type SidebarRoute = {
 };
 
 /**
- * Get all routes with their visibility permissions
- * Cached to avoid multiple database calls
- * Revalidated every hour or on-demand via tags
+ * Cached route metadata from database (no auth calls inside "use cache")
  */
-export async function getRoutesWithPermissions() {
-   // Get admin info OUTSIDE of cache scope
-   const session = await auth();
-   const adminId = session?.user?.id ? session.user.id : null;
-   const adminLevel = (session?.user as any)?.level as string | undefined;
+async function getCachedAllRoutesMeta() {
+   'use cache';
+   cacheLife('hours');
+   cacheTag('sidebar-routes', 'rbac-data', 'rbac-routes');
 
-   // Get admin accessible groups OUTSIDE of cache scope
-   let adminAccessibleGroupIds = new Set<bigint>();
-   if (adminLevel === 'ADMIN' && adminId) {
-      const admin = await prisma.admin.findUnique({
-         where: { id: adminId },
-         select: {
-            adminRoles: {
-               select: { roleId: true },
-            },
-         },
-      });
-
-      if (admin && admin.adminRoles && admin.adminRoles.length > 0) {
-         const roleIds = admin.adminRoles.map((ar) => ar.roleId);
-         const roleRouteGroups = await prisma.roleRouteGroup.findMany({
-            where: { roleId: { in: roleIds } },
-            select: { groupId: true },
-         });
-         adminAccessibleGroupIds = new Set(roleRouteGroups.map((rrg) => rrg.groupId));
-      }
-   }
-
-   // NOW use cache for the route fetching
-   return getCachedRoutePermissions(adminAccessibleGroupIds);
-}
-
-/**
- * Cached route fetching - no auth calls inside
- */
-async function getCachedRoutePermissions(adminAccessibleGroupIds: Set<bigint>) {
-   // Get all routes from database
    const routes = await prisma.route.findMany({
       select: {
          path: true,
@@ -62,7 +30,31 @@ async function getCachedRoutePermissions(adminAccessibleGroupIds: Set<bigint>) {
       },
    });
 
-   // Create a map for quick lookup: path -> permissions
+   return routes.map((r) => ({
+      path: r.path,
+      visibleToAdmin: r.visibleToAdmin,
+      visibleToSuperAdmin: r.visibleToSuperAdmin,
+      groupId: r.groupId.toString(),
+      groupName: r.group.name,
+   }));
+}
+
+/**
+ * Get all routes with their visibility permissions (Layer 2 cached)
+ */
+export async function getRoutesWithPermissions() {
+   const session = await auth();
+   const adminId = session?.user?.id ?? null;
+   const adminLevel = (session?.user as any)?.level as string | undefined;
+
+   const [allRoutes, accessiblePaths] = await Promise.all([
+      getCachedAllRoutesMeta(),
+      adminId && adminLevel ? getCachedAdminAccessiblePaths(adminId, adminLevel) : Promise.resolve([]),
+   ]);
+
+   const accessibleSet = new Set(accessiblePaths);
+   const hasWildcard = accessibleSet.has('*');
+
    const routePermissions = new Map<
       string,
       {
@@ -74,14 +66,13 @@ async function getCachedRoutePermissions(adminAccessibleGroupIds: Set<bigint>) {
       }
    >();
 
-   routes.forEach((route) => {
-      const isAccessibleToAdmin = adminAccessibleGroupIds.has(route.groupId);
+   allRoutes.forEach((route) => {
       routePermissions.set(route.path, {
          visibleToAdmin: route.visibleToAdmin,
          visibleToSuperAdmin: route.visibleToSuperAdmin,
-         groupName: route.group.name,
-         groupId: route.groupId,
-         isAccessibleToAdmin,
+         groupName: route.groupName,
+         groupId: BigInt(route.groupId),
+         isAccessibleToAdmin: hasWildcard || accessibleSet.has(route.path),
       });
    });
 
@@ -105,25 +96,19 @@ export async function filterRoutesByPermissions(
       }
    >
 ): Promise<SidebarRoute[]> {
-   // DEVELOPER has full access - no filtering
    if (adminLevel === 'DEVELOPER') {
       return routes;
    }
 
    return routes.filter((route) => {
       const permissions = routePermissions.get(route.path);
-
-      // If route not in database, hide it (safe default)
-      if (!permissions) {
-         return false;
-      }
+      if (!permissions) return false;
 
       if (adminLevel === 'SUPER_ADMIN') {
          return permissions.visibleToSuperAdmin;
       }
 
       if (adminLevel === 'ADMIN') {
-         // ADMIN users must have: visible flag AND role assigned to the route group
          return permissions.visibleToAdmin && permissions.isAccessibleToAdmin;
       }
 

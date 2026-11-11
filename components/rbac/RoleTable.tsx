@@ -4,6 +4,7 @@ import { deleteRole, listRoles } from "@/actions/rbac/roles";
 import { Button } from "@/components/ui/button";
 import { Edit2, Link, Plus, Search, Users } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition, useMemo } from "react";
 import AssignRouteGroupsDialog from "./AssignRouteGroupsDialog";
 import AssignUsersDialog from "./AssignUsersDialog";
@@ -30,12 +31,21 @@ type RouteGroup = {
    name: string;
 };
 
-export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGroup[] }) {
+export default function RoleTable({
+   routeGroups = [],
+   initialData,
+}: {
+   routeGroups?: RouteGroup[];
+   initialData?: RoleData;
+}) {
+   const router = useRouter();
    const [isPending, startTransition] = useTransition();
    const [q, setQ] = useState("");
-   const [page, setPage] = useState(1);
-   const [pageSize, setPageSize] = useState(10);
-   const [data, setData] = useState<RoleData>({ items: [], total: 0, page: 1, pageSize: 10 });
+   const [page, setPage] = useState(initialData?.page ?? 1);
+   const [pageSize, setPageSize] = useState(initialData?.pageSize ?? 10);
+   const [data, setData] = useState<RoleData>(
+      initialData ?? { items: [], total: 0, page: 1, pageSize: 10 }
+   );
    const [editingRole, setEditingRole] = useState<RoleItem | null>(null);
    const [showDialog, setShowDialog] = useState(false);
    const [assigningRole, setAssigningRole] = useState<RoleItem | null>(null);
@@ -47,9 +57,20 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
    const { executeAsync: doList } = useAction(listRoles);
 
    useEffect(() => {
-      fetchRoles(1, q, pageSize);
+      if (!initialData) {
+         fetchRoles(1, q, pageSize);
+      } else {
+         setData(initialData);
+      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, []);
+   }, [initialData]);
+
+   function notifyPermissionsChanged() {
+      router.refresh();
+      if (typeof window !== "undefined") {
+         window.dispatchEvent(new Event("rbac-permissions-updated"));
+      }
+   }
 
    function fetchRoles(targetPage = page, searchTerm = q, targetPageSize = pageSize) {
       startTransition(async () => {
@@ -71,6 +92,7 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
       const result = await doDelete({ id });
       if (result?.data?.ok) {
          fetchRoles(page, q, pageSize);
+         notifyPermissionsChanged();
       } else {
          alert(result?.data?.error || "Failed to delete role");
       }
@@ -90,6 +112,7 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
       setShowDialog(false);
       if (refreshed) {
          fetchRoles(page, q, pageSize);
+         notifyPermissionsChanged();
       }
    }
 
@@ -102,6 +125,7 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
       setShowAssignDialog(false);
       if (refreshed) {
          fetchRoles(page, q, pageSize);
+         notifyPermissionsChanged();
       }
    }
 
@@ -114,6 +138,7 @@ export default function RoleTable({ routeGroups = [] }: { routeGroups?: RouteGro
       setShowAssignUsersDialog(false);
       if (refreshed) {
          fetchRoles(page, q, pageSize);
+         notifyPermissionsChanged();
       }
    }
 

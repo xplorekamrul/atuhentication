@@ -4,6 +4,7 @@ import { deleteRouteGroup, listRouteGroups } from "@/actions/rbac/route-groups";
 import { Button } from "@/components/ui/button";
 import { Edit2, Link as LinkIcon, Plus, Search } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition, useMemo } from "react";
 import AssignRoutesDialog from "./AssignRoutesDialog";
 import RouteGroupDialog from "./RouteGroupDialog";
@@ -33,14 +34,19 @@ type RouteItem = {
 
 export default function RouteGroupTable({
    routes = [],
+   initialData,
 }: {
    routes?: RouteItem[];
+   initialData?: RouteGroupData;
 }) {
+   const router = useRouter();
    const [isPending, startTransition] = useTransition();
    const [q, setQ] = useState("");
-   const [page, setPage] = useState(1);
-   const [pageSize, setPageSize] = useState(10);
-   const [data, setData] = useState<RouteGroupData>({ items: [], total: 0, page: 1, pageSize: 10 });
+   const [page, setPage] = useState(initialData?.page ?? 1);
+   const [pageSize, setPageSize] = useState(initialData?.pageSize ?? 10);
+   const [data, setData] = useState<RouteGroupData>(
+      initialData ?? { items: [], total: 0, page: 1, pageSize: 10 }
+   );
    const [editingGroup, setEditingGroup] = useState<RouteGroupItem | null>(null);
    const [showDialog, setShowDialog] = useState(false);
    const [assigningGroup, setAssigningGroup] = useState<RouteGroupItem | null>(null);
@@ -50,9 +56,20 @@ export default function RouteGroupTable({
    const { executeAsync: doList } = useAction(listRouteGroups);
 
    useEffect(() => {
-      fetchGroups(1, q, pageSize);
+      if (!initialData) {
+         fetchGroups(1, q, pageSize);
+      } else {
+         setData(initialData);
+      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, []);
+   }, [initialData]);
+
+   function notifyPermissionsChanged() {
+      router.refresh();
+      if (typeof window !== "undefined") {
+         window.dispatchEvent(new Event("rbac-permissions-updated"));
+      }
+   }
 
    function fetchGroups(targetPage = page, searchTerm = q, targetPageSize = pageSize) {
       startTransition(async () => {
@@ -74,6 +91,7 @@ export default function RouteGroupTable({
       const result = await doDelete({ id });
       if (result?.data?.ok) {
          fetchGroups(page, q, pageSize);
+         notifyPermissionsChanged();
       } else {
          alert(result?.data?.error || "Failed to delete route group");
       }
@@ -93,6 +111,7 @@ export default function RouteGroupTable({
       setShowDialog(false);
       if (refreshed) {
          fetchGroups(page, q, pageSize);
+         notifyPermissionsChanged();
       }
    }
 
@@ -105,6 +124,7 @@ export default function RouteGroupTable({
       setShowAssignDialog(false);
       if (refreshed) {
          fetchGroups(page, q, pageSize);
+         notifyPermissionsChanged();
       }
    }
 

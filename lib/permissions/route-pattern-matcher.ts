@@ -9,11 +9,17 @@
  * - URL: /employees/123/manage does not match
  */
 
+// In-memory cache for compiled route regex patterns
+const regexCache = new Map<string, RegExp>();
+
 /**
- * Convert a route pattern to a regex
+ * Convert a route pattern to a regex (memoized in memory)
  * Replaces [param] with regex pattern to match any value
  */
 export function patternToRegex(pattern: string): RegExp {
+   const cached = regexCache.get(pattern);
+   if (cached) return cached;
+
    // Step 1: Escape special regex characters (including [ and ])
    let regexPattern = pattern.replace(/[.+?^${}|\\[\]]/g, (char) => '\\' + char);
 
@@ -21,22 +27,18 @@ export function patternToRegex(pattern: string): RegExp {
    regexPattern = regexPattern.replace(/\\\[([^\]]+)\\\]/g, '([^/]+)');
 
    // Step 3: Add anchors to match the entire string
-   return new RegExp('^' + regexPattern + '$');
+   const regex = new RegExp('^' + regexPattern + '$');
+   regexCache.set(pattern, regex);
+   return regex;
 }
 
 /**
  * Check if a URL matches a route pattern
  */
 export function matchesPattern(pattern: string, url: string): boolean {
-   const regex = patternToRegex(pattern);
-   const result = regex.test(url);
-
-   // Debug logging for pattern matching
-   if (pattern.includes('[')) {
-      console.log(`[matchesPattern] Pattern: ${pattern}, URL: ${url}, Regex: ${regex.source}, Result: ${result}`);
-   }
-
-   return result;
+   // Fast-path: exact static match without regex
+   if (pattern === url) return true;
+   return patternToRegex(pattern).test(url);
 }
 
 /**

@@ -1,5 +1,6 @@
 "use server";
 
+import { invalidateAdminPermissionsCache } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/prisma";
 import { superAdminActionClient } from "@/lib/safe-action/clients";
 import { updateUserStatusSchema } from "@/lib/validations/users";
@@ -87,6 +88,8 @@ export const updateUserStatus = superAdminActionClient
         },
       });
 
+      await invalidateAdminPermissionsCache(id);
+
       return { ok: true as const, user: admin };
     }
 
@@ -127,6 +130,8 @@ export const updateUserStatus = superAdminActionClient
           suspendedAt: true,
         },
       });
+
+      await invalidateAdminPermissionsCache(id);
 
       return { ok: true as const, user: admin };
     }

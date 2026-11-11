@@ -1,6 +1,8 @@
 "use server";
 
 import { auth } from "@/lib/auth";
+import { invalidateAdminPermissionsCache } from "@/lib/permissions/permissions";
+import { getCachedAllRouteGroups, getCachedAllRoutes } from "@/lib/permissions/rbac-cache";
 import { prisma } from "@/lib/prisma";
 import fs from "fs";
 import path from "path";
@@ -20,6 +22,9 @@ interface SyncResult {
 const EXCLUDED_ROUTES = [
    "/",
    "/rbac",
+   "/admin",
+   "/admin/login",
+   "/admin/rbac",
    "/developer/api-tester",
    "/forgot",
    "/forgot/reset",
@@ -174,6 +179,10 @@ export async function syncRoutesToDatabase(): Promise<SyncResult> {
          }
       }
 
+      if (addedCount > 0) {
+         await invalidateAdminPermissionsCache();
+      }
+
       return {
          ok: true,
          message: `Successfully synced ${addedCount} new routes to database`,
@@ -190,7 +199,7 @@ export async function syncRoutesToDatabase(): Promise<SyncResult> {
    }
 }
 
-// Get all routes and route groups
+// Get all routes and route groups (served from Next.js "use cache")
 export async function getAllRoutesAndGroups() {
    const session = await auth();
 
@@ -208,38 +217,22 @@ export async function getAllRoutesAndGroups() {
    }
 
    try {
-      const [routes, routeGroups] = await Promise.all([
-         prisma.route.findMany({
-            select: {
-               id: true,
-               path: true,
-               name: true,
-               groupId: true,
-               group: { select: { id: true, name: true } },
-               createdAt: true,
-            },
-            orderBy: { path: "asc" },
-         }),
-         prisma.routeGroup.findMany({
-            select: { id: true, name: true },
-            orderBy: { name: "asc" },
-         }),
+      const [routesData, routeGroupsData] = await Promise.all([
+         getCachedAllRoutes(),
+         getCachedAllRouteGroups(),
       ]);
 
       return {
          ok: true,
-         routes: routes.map((r) => ({
-            id: r.id.toString(),
+         routes: routesData.items.map((r) => ({
+            id: r.id,
             path: r.path,
             name: r.name,
-            groupId: r.groupId.toString(),
-            group: { id: r.group.id.toString(), name: r.group.name },
-            createdAt: r.createdAt,
+            groupId: r.groupId,
+            group: r.group,
+            createdAt: new Date(r.createdAt),
          })),
-         routeGroups: routeGroups.map((rg) => ({
-            id: rg.id.toString(),
-            name: rg.name,
-         })),
+         routeGroups: routeGroupsData.items,
       };
    } catch (error) {
       console.error("Error fetching routes:", error);

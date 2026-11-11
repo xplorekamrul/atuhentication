@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Edit2, Plus, Search } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition, useMemo } from "react";
 import RouteDialog from "./RouteDialog";
 import { DataTable, ColumnDef } from "@/components/shared/data-table";
@@ -44,15 +45,20 @@ type RouteGroup = {
 
 export default function RouteTable({
    routeGroups,
+   initialData,
 }: {
    routeGroups: RouteGroup[];
+   initialData?: RouteData;
 }) {
+   const router = useRouter();
    const [isPending, startTransition] = useTransition();
    const [q, setQ] = useState("");
    const [groupId, setGroupId] = useState("all");
-   const [page, setPage] = useState(1);
-   const [pageSize, setPageSize] = useState(10);
-   const [data, setData] = useState<RouteData>({ items: [], total: 0, page: 1, pageSize: 10 });
+   const [page, setPage] = useState(initialData?.page ?? 1);
+   const [pageSize, setPageSize] = useState(initialData?.pageSize ?? 10);
+   const [data, setData] = useState<RouteData>(
+      initialData ?? { items: [], total: 0, page: 1, pageSize: 10 }
+   );
    const [editingRoute, setEditingRoute] = useState<RouteItem | null>(null);
    const [showDialog, setShowDialog] = useState(false);
 
@@ -60,9 +66,20 @@ export default function RouteTable({
    const { executeAsync: doList } = useAction(listRoutes);
 
    useEffect(() => {
-      fetchRoutes(1, q, groupId, pageSize);
+      if (!initialData) {
+         fetchRoutes(1, q, groupId, pageSize);
+      } else {
+         setData(initialData);
+      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, []);
+   }, [initialData]);
+
+   function notifyPermissionsChanged() {
+      router.refresh();
+      if (typeof window !== "undefined") {
+         window.dispatchEvent(new Event("rbac-permissions-updated"));
+      }
+   }
 
    function fetchRoutes(targetPage = page, searchTerm = q, filterGroupId = groupId, targetPageSize = pageSize) {
       startTransition(async () => {
@@ -94,6 +111,7 @@ export default function RouteTable({
       const result = await doDelete({ id });
       if (result?.data?.ok) {
          fetchRoutes(page, q, groupId, pageSize);
+         notifyPermissionsChanged();
       } else {
          alert(result?.data?.error || "Failed to delete route");
       }
@@ -113,6 +131,7 @@ export default function RouteTable({
       setShowDialog(false);
       if (refreshed) {
          fetchRoutes(page, q, groupId, pageSize);
+         notifyPermissionsChanged();
       }
    }
 
@@ -263,7 +282,12 @@ export default function RouteTable({
 
             </div>
             <div className="flex gap-x-2">
-               <SyncRoutesButton onSyncComplete={() => fetchRoutes(1, q, groupId, pageSize)} />
+               <SyncRoutesButton
+                  onSyncComplete={() => {
+                     fetchRoutes(1, q, groupId, pageSize);
+                     notifyPermissionsChanged();
+                  }}
+               />
                <button
                   onClick={handleCreate}
                   disabled={isPending}

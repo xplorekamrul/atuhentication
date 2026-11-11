@@ -1,5 +1,6 @@
 "use server";
 
+import { invalidateAdminPermissionsCache } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/prisma";
 import { superAdminActionClient } from "@/lib/safe-action/clients";
 import { deleteUserSchema } from "@/lib/validations/users";
@@ -51,6 +52,7 @@ export const deleteUser = superAdminActionClient
       if (targetAdmin.email) {
         resetExponentialLockout(`exp:account:${targetAdmin.email.toLowerCase().trim()}`);
       }
+      await invalidateAdminPermissionsCache(id);
 
       return { ok: true as const };
     }
@@ -74,6 +76,7 @@ export const deleteUser = superAdminActionClient
       if (targetAdmin.email) {
         resetExponentialLockout(`exp:account:${targetAdmin.email.toLowerCase().trim()}`);
       }
+      await invalidateAdminPermissionsCache(id);
 
       return { ok: true as const };
     }

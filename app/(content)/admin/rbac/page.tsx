@@ -1,126 +1,23 @@
-import { listRoles } from "@/actions/rbac/roles";
-import { listRouteGroups } from "@/actions/rbac/route-groups";
-import { listRoutes } from "@/actions/rbac/routes";
 import RoleTable from "@/components/rbac/RoleTable";
 import RouteGroupTable from "@/components/rbac/RouteGroupTable";
 import RouteTable from "@/components/rbac/RouteTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import {
+   getCachedAllRouteGroups,
+   getCachedAllRoutes,
+   getCachedRolesList,
+   getCachedRouteGroupsList,
+   getCachedRoutesList,
+} from "@/lib/permissions/rbac-cache";
 import { Suspense } from "react";
-
-
 
 export const metadata = {
    title: "RBAC Management",
    description: "Manage roles, route groups, and routes",
 };
 
-async function getAllRouteGroups() {
-   try {
-      const result = await listRouteGroups({ page: 1, pageSize: 1000 });
-      if (result?.data?.ok) {
-         return {
-            items: result.data.items.map((item: any) => ({
-               id: item.id,
-               name: item.name,
-            })),
-            total: result.data.total,
-         };
-      }
-   } catch (e) {
-      console.error("Error in listRouteGroups:", e);
-   }
-
-   try {
-      const [items, total] = await Promise.all([
-         prisma.routeGroup.findMany({
-            take: 1000,
-            orderBy: { name: "asc" },
-            select: { id: true, name: true },
-         }),
-         prisma.routeGroup.count(),
-      ]);
-
-      return {
-         items: items.map((g) => ({ id: g.id.toString(), name: g.name })),
-         total,
-      };
-   } catch {
-      return { items: [], total: 0 };
-   }
-}
-
-async function getAllRoutes() {
-   try {
-      const result = await listRoutes({ page: 1, pageSize: 1000 });
-      if (result?.data?.ok) {
-         return {
-            items: result.data.items,
-            total: result.data.total,
-         };
-      }
-   } catch (e) {
-      console.error("Error in listRoutes:", e);
-   }
-
-   try {
-      const [items, total] = await Promise.all([
-         prisma.route.findMany({
-            take: 1000,
-            orderBy: { path: "asc" },
-            select: {
-               id: true,
-               path: true,
-               name: true,
-               groupId: true,
-               visibleToAdmin: true,
-               visibleToSuperAdmin: true,
-               editableByAdmin: true,
-               editableBySuperAdmin: true,
-               group: { select: { id: true, name: true } },
-               createdAt: true,
-            },
-         }),
-         prisma.route.count(),
-      ]);
-
-      return {
-         items: items.map((r) => ({
-            ...r,
-            id: r.id.toString(),
-            groupId: r.groupId.toString(),
-            group: { id: r.group.id.toString(), name: r.group.name },
-            createdAt: r.createdAt.toISOString(),
-         })),
-         total,
-      };
-   } catch {
-      return { items: [], total: 0 };
-   }
-}
-
-async function getRoleCount() {
-   try {
-      const result = await listRoles({ page: 1, pageSize: 1 });
-      if (result?.data?.ok) {
-         return result.data.total;
-      }
-   } catch {}
-
-   try {
-      return await prisma.role.count();
-   } catch {
-      return 0;
-   }
-}
-
-export default async function RBACPage() {
-   const session = await auth();
-   if (!session?.user) {
-      return <div className="p-6">Unauthorized</div>;
-   }
-
+export default function RBACPage() {
    return (
       <div className="space-y-6 p-4 sm:p-6">
          <div>
@@ -130,7 +27,14 @@ export default async function RBACPage() {
             </p>
          </div>
 
-         <Suspense fallback={<div className="space-y-4 text-muted-foreground p-4">Loading RBAC data...</div>}>
+         <Suspense
+            fallback={
+               <div className="space-y-4 p-4 border border-primary/20 rounded-md bg-card">
+                  <div className="h-8 w-64 bg-muted animate-pulse rounded" />
+                  <div className="h-48 w-full bg-muted/50 animate-pulse rounded" />
+               </div>
+            }
+         >
             <RBACContent />
          </Suspense>
       </div>
@@ -138,10 +42,26 @@ export default async function RBACPage() {
 }
 
 async function RBACContent() {
-   const [routeGroupsData, routesData, rolesCount] = await Promise.all([
-      getAllRouteGroups(),
-      getAllRoutes(),
-      getRoleCount(),
+   const session = await auth();
+   const level = (session?.user as any)?.level as string | undefined;
+
+   if (!session?.user || level !== "DEVELOPER") {
+      return <div className="p-6 text-destructive font-medium">Unauthorized</div>;
+   }
+
+   // All initial data fetched from Next.js 16 Layer 2 "use cache" (0 DB hits on cache hit)
+   const [
+      routeGroupsData,
+      routesData,
+      initialRoles,
+      initialRouteGroups,
+      initialRoutes,
+   ] = await Promise.all([
+      getCachedAllRouteGroups(),
+      getCachedAllRoutes(),
+      getCachedRolesList(1, 10, ""),
+      getCachedRouteGroupsList(1, 10, ""),
+      getCachedRoutesList(1, 10, ""),
    ]);
 
    const allRouteGroups = routeGroupsData.items;
@@ -149,6 +69,7 @@ async function RBACContent() {
 
    const allRoutes = routesData.items;
    const routesCount = routesData.total;
+   const rolesCount = initialRoles.total;
 
    return (
       <Tabs defaultValue="roles" className="w-full gap-0">
@@ -186,15 +107,15 @@ async function RBACContent() {
 
          <div className="border border-primary/20 border-t-0 rounded-b-md p-4 bg-card">
             <TabsContent value="roles" className="mt-0 space-y-4">
-               <RoleTable routeGroups={allRouteGroups} />
+               <RoleTable routeGroups={allRouteGroups} initialData={initialRoles} />
             </TabsContent>
 
             <TabsContent value="route-groups" className="mt-0 space-y-4">
-               <RouteGroupTable routes={allRoutes} />
+               <RouteGroupTable routes={allRoutes} initialData={initialRouteGroups} />
             </TabsContent>
 
             <TabsContent value="routes" className="mt-0 space-y-4">
-               <RouteTable routeGroups={allRouteGroups} />
+               <RouteTable routeGroups={allRouteGroups} initialData={initialRoutes} />
             </TabsContent>
          </div>
       </Tabs>

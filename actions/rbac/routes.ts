@@ -1,6 +1,8 @@
 "use server";
 
 import { serializeBigInt, toBigIntOrNull } from "@/lib/bigint-utils";
+import { invalidateAdminPermissionsCache } from "@/lib/permissions/permissions";
+import { getCachedRoutesList } from "@/lib/permissions/rbac-cache";
 import { prisma } from "@/lib/prisma";
 import { developerActionClient } from "@/lib/safe-action/clients";
 import {
@@ -9,63 +11,13 @@ import {
    routeListSchema,
    routeUpdateSchema,
 } from "@/lib/validations/rbac";
-import { Prisma } from "@prisma/client";
 import { revalidateTag } from "next/cache";
 
 export const listRoutes = developerActionClient
    .inputSchema(routeListSchema)
    .action(async ({ parsedInput }) => {
       const { page, pageSize, q, groupId } = parsedInput;
-
-      const and: Prisma.RouteWhereInput[] = [];
-
-      if (q) {
-         and.push({
-            OR: [
-               { path: { contains: q } },
-               { name: { contains: q } },
-            ],
-         });
-      }
-
-      if (groupId) {
-         const gId = toBigIntOrNull(groupId);
-         if (gId) {
-            and.push({ groupId: gId });
-         }
-      }
-
-      const where: Prisma.RouteWhereInput = and.length ? { AND: and } : {};
-
-      const [items, total] = await Promise.all([
-         prisma.route.findMany({
-            where,
-            orderBy: { path: "asc" },
-            skip: (page - 1) * pageSize,
-            take: pageSize,
-            select: {
-               id: true,
-               path: true,
-               name: true,
-               groupId: true,
-               visibleToAdmin: true,
-               visibleToSuperAdmin: true,
-               editableByAdmin: true,
-               editableBySuperAdmin: true,
-               group: { select: { id: true, name: true } },
-               createdAt: true,
-            },
-         }),
-         prisma.route.count({ where }),
-      ]);
-
-      return {
-         ok: true as const,
-         items: serializeBigInt(items),
-         total,
-         page,
-         pageSize,
-      };
+      return getCachedRoutesList(page, pageSize, q ?? "", groupId);
    });
 
 export const createRoute = developerActionClient
@@ -120,11 +72,9 @@ export const createRoute = developerActionClient
          },
       });
 
-      // Revalidate all permission-related caches immediately
-      revalidateTag("sidebar-routes", "max");
-      revalidateTag("route-edit-permissions", "max");
+      // Revalidate Layer 1 (memory) and Layer 2 (Next.js cache tags) immediately
+      await invalidateAdminPermissionsCache();
       revalidateTag(`route-${path}`, "max");
-      revalidateTag("user-edit-permissions", "max");
 
       return { ok: true as const, data: serializeBigInt(route) };
    });
@@ -193,12 +143,10 @@ export const updateRoute = developerActionClient
          },
       });
 
-      // Revalidate all permission-related caches immediately
-      revalidateTag("sidebar-routes", "max");
-      revalidateTag("route-edit-permissions", "max");
+      // Revalidate Layer 1 (memory) and Layer 2 (Next.js cache tags) immediately
+      await invalidateAdminPermissionsCache();
       revalidateTag(`route-${path}`, "max");
       revalidateTag(`route-${route.path}`, "max"); // Also invalidate old path if changed
-      revalidateTag("user-edit-permissions", "max");
 
       return { ok: true as const, data: serializeBigInt(updated) };
    });
@@ -226,11 +174,9 @@ export const deleteRoute = developerActionClient
          where: { id: routeId },
       });
 
-      // Revalidate all permission-related caches immediately
-      revalidateTag("sidebar-routes", "max");
-      revalidateTag("route-edit-permissions", "max");
+      // Revalidate Layer 1 (memory) and Layer 2 (Next.js cache tags) immediately
+      await invalidateAdminPermissionsCache();
       revalidateTag(`route-${route.path}`, "max");
-      revalidateTag("user-edit-permissions", "max");
 
       return { ok: true as const };
    });

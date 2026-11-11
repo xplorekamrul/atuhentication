@@ -112,10 +112,9 @@ export async function proxy(req: NextRequest) {
         return NextResponse.next();
       }
 
-      // SUPER_ADMIN and ADMIN: check permissions
+      // SUPER_ADMIN and ADMIN: check permissions via Layer 1 in-memory cache (no repeated DB hits)
       if ((level === LEVEL_SUPER || level === LEVEL_ADMIN) && userId) {
-        const hasAccess = await canAdminAccessPath(userId, pathname);
-        // console.log('[proxy] Admin access check:', hasAccess);
+        const hasAccess = await canAdminAccessPath(userId, pathname, level);
         if (!hasAccess) {
           return redirectToAdminHome();
         }

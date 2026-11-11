@@ -1,6 +1,7 @@
 "use server";
 
 import { serializeBigInt, toBigIntOrNull } from "@/lib/bigint-utils";
+import { invalidateAdminPermissionsCache } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/prisma";
 import { developerActionClient } from "@/lib/safe-action/clients";
 import { z } from "zod";
@@ -134,6 +135,8 @@ export const assignUserToRole = developerActionClient
          },
       });
 
+      await invalidateAdminPermissionsCache(adminId);
+
       return { ok: true as const };
    });
 
@@ -167,7 +170,7 @@ export const removeUserFromRole = developerActionClient
             },
          });
 
-         console.log(`Admin ${admin.email} removed from role`);
+         await invalidateAdminPermissionsCache(adminId);
 
          return { ok: true as const };
       } catch (error) {
@@ -223,6 +226,8 @@ export const assignMultipleRolesToUser = developerActionClient
             roleId,
          })),
       });
+
+      await invalidateAdminPermissionsCache(adminId);
 
       return { ok: true as const };
    });

@@ -1,5 +1,6 @@
 "use server";
 
+import { invalidateAdminPermissionsCache } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/prisma";
 import { developerActionClient } from "@/lib/safe-action/clients";
 import { z } from "zod";
@@ -45,6 +46,7 @@ export const assignRoutesToGroup = developerActionClient
                groupId: groupIdBigInt,
             },
          });
+         await invalidateAdminPermissionsCache();
       }
 
       return {

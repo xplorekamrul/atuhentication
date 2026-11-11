@@ -1,6 +1,8 @@
 "use server";
 
 import { serializeBigInt, toBigIntOrNull } from "@/lib/bigint-utils";
+import { invalidateAdminPermissionsCache } from "@/lib/permissions/permissions";
+import { getCachedRolesList } from "@/lib/permissions/rbac-cache";
 import { prisma } from "@/lib/prisma";
 import { developerActionClient } from "@/lib/safe-action/clients";
 import {
@@ -9,42 +11,12 @@ import {
    roleListSchema,
    roleUpdateSchema,
 } from "@/lib/validations/rbac";
-import { Prisma } from "@prisma/client";
 
 export const listRoles = developerActionClient
    .inputSchema(roleListSchema)
    .action(async ({ parsedInput }) => {
       const { page, pageSize, q } = parsedInput;
-
-      const where: Prisma.RoleWhereInput = q
-         ? { name: { contains: q } }
-         : {};
-
-      const [items, total] = await Promise.all([
-         prisma.role.findMany({
-            where,
-            orderBy: { name: "asc" },
-            skip: (page - 1) * pageSize,
-            take: pageSize,
-            select: {
-               id: true,
-               name: true,
-               createdAt: true,
-               _count: {
-                  select: { adminRoles: true, roleRouteGroups: true },
-               },
-            },
-         }),
-         prisma.role.count({ where }),
-      ]);
-
-      return {
-         ok: true as const,
-         items: serializeBigInt(items),
-         total,
-         page,
-         pageSize,
-      };
+      return getCachedRolesList(page, pageSize, q ?? "");
    });
 
 export const createRole = developerActionClient
@@ -65,6 +37,8 @@ export const createRole = developerActionClient
          data: { name },
          select: { id: true, name: true, createdAt: true },
       });
+
+      await invalidateAdminPermissionsCache();
 
       return { ok: true as const, data: serializeBigInt(role) };
    });
@@ -104,6 +78,8 @@ export const updateRole = developerActionClient
          select: { id: true, name: true, createdAt: true },
       });
 
+      await invalidateAdminPermissionsCache();
+
       return { ok: true as const, data: serializeBigInt(updated) };
    });
 
@@ -132,6 +108,8 @@ export const deleteRole = developerActionClient
       await prisma.role.delete({
          where: { id: roleId },
       });
+
+      await invalidateAdminPermissionsCache();
 
       return { ok: true as const };
    });

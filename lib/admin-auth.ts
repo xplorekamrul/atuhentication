@@ -43,9 +43,10 @@ export const adminAuthOptions: NextAuthOptions = {
             const ok = await bcrypt.compare(password, admin.password);
             if (!ok) return null;
 
+            if (admin.status !== "ACTIVE") return null;
+
             // Log admin login history
             try {
-               console.log("Attempting to record admin login history for adminId:", admin.id);
                const headers = req?.headers as Record<string, string | string[]> | undefined;
 
                let ip = (headers?.["x-forwarded-for"] as string) || (headers?.["x-real-ip"] as string) || "Unknown IP";
@@ -61,19 +62,19 @@ export const adminAuthOptions: NextAuthOptions = {
                      userAgent: ua,
                   }
                });
-               console.log("Admin login history saved successfully.");
             } catch (error) {
                console.error("CRITICAL: Failed to record admin login history.", error);
             }
 
             const u: User = {
-               id: admin.id.toString(),
+               id: admin.id,
                name: admin.name ?? null,
                email: admin.email,
                image: admin.image,
                userType: "ADMIN",
                level: admin.level as "ADMIN" | "SUPER_ADMIN" | "DEVELOPER",
                status: admin.status as "ACTIVE" | "INACTIVE" | "SUSPENDED",
+               sessionVersion: admin.sessionVersion,
             } as User;
 
             return u;
@@ -84,28 +85,32 @@ export const adminAuthOptions: NextAuthOptions = {
       async jwt({ token, user }: { token: JWT; user?: User }) {
          if (user) {
             const dbAdmin = await prisma.admin.findUnique({
-               where: { id: BigInt(user.id) },
+               where: { id: String(user.id) },
                select: { sessionVersion: true },
             });
-            token.id = user.id;
+            token.id = String(user.id);
             token.userType = user.userType;
             token.level = user.level;
             token.status = user.status;
             token.picture = user.image;
             token.sessionVersion = dbAdmin?.sessionVersion ?? 1;
          } else if (token.id) {
-            // Try to find admin
+            // Try to find admin by string CUID ID
             const dbAdmin = await prisma.admin.findUnique({
-               where: { id: BigInt(token.id as string) },
+               where: { id: String(token.id) },
                select: { id: true, level: true, status: true, name: true, image: true, sessionVersion: true },
             });
 
-            if (!dbAdmin || dbAdmin.status === "INACTIVE" || dbAdmin.status === "SUSPENDED" || dbAdmin.sessionVersion !== token.sessionVersion) {
+            if (!dbAdmin || dbAdmin.status !== "ACTIVE" || dbAdmin.sessionVersion !== token.sessionVersion) {
                return null as any; // Invalidates session
             }
 
+            token.id = dbAdmin.id;
+            token.userType = "ADMIN";
+            token.level = dbAdmin.level;
             token.status = dbAdmin.status;
             token.picture = dbAdmin.image;
+            token.sessionVersion = dbAdmin.sessionVersion;
          }
          return token;
       },

@@ -111,51 +111,79 @@ export default function Sidebar({
   const [noRoutesInDatabase, setNoRoutesInDatabase] = useState(false);
   const navRef = useRef<HTMLElement>(null);
 
-  // Fetch and filter routes based on permissions
+  // Fetch and filter routes based on permissions with hydration-safe sessionStorage cache
   useEffect(() => {
-    async function loadFilteredRoutes() {
-      try {
-        setIsLoading(true);
-        // Pass only the data (without icons) to server action
-        const hardcodedNavData = hardcodedNav.map((node) => {
-          if (isGroup(node)) {
-            return {
-              label: node.label,
-              children: node.children.map((child) => ({
-                label: child.label,
-                href: child.href,
-              })),
-            };
-          }
-          return {
-            label: node.label,
-            href: node.href,
-          };
-        });
+    if (!user?.id) return;
 
+    const cacheKey = `_cached_sidebar_routes_${user.id}`;
+    const hardcodedNavData = hardcodedNav.map((node) => {
+      if (isGroup(node)) {
+        return {
+          label: node.label,
+          children: node.children.map((child) => ({
+            label: child.label,
+            href: child.href,
+          })),
+        };
+      }
+      return {
+        label: node.label,
+        href: node.href,
+      };
+    });
+
+    // 1. Immediately restore from sessionStorage on client mount (0 hydration mismatch)
+    let hasCachedItems = false;
+    try {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        setNoRoutesInDatabase(Boolean(parsed.noRoutesInDatabase));
+        setItems(reconstructWithIcons(parsed.routes || []));
+        setIsLoading(false);
+        hasCachedItems = true;
+      }
+    } catch {
+      // Ignore malformed cache
+    }
+
+    // 2. Fetch fresh filtered routes in background from Layer 2 cached server action
+    async function loadFilteredRoutes(showLoader = false) {
+      try {
+        if (showLoader) setIsLoading(true);
         const result = await getFilteredSidebarRoutes(hardcodedNavData);
-        console.log('[Sidebar] Filtered routes result:', result);
 
         setNoRoutesInDatabase(result.noRoutesInDatabase);
+        setItems(reconstructWithIcons(result.routes));
 
-        // Reconstruct with icons on client side
-        const reconstructed = reconstructWithIcons(result.routes);
-        console.log('[Sidebar] Reconstructed routes:', reconstructed);
-
-        // Use exactly what the server returned - no fallback
-        setItems(reconstructed);
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify(result));
+        } catch {
+          // Ignore storage quota errors
+        }
       } catch (error) {
         console.error("[Sidebar] Failed to load filtered routes:", error);
-        // On error, show empty sidebar
-        setItems([]);
+        if (!hasCachedItems) {
+          setItems([]);
+        }
       } finally {
         setIsLoading(false);
       }
     }
 
-    if (user) {
-      loadFilteredRoutes();
-    }
+    loadFilteredRoutes(!hasCachedItems);
+
+    const handlePermissionsUpdated = () => {
+      try {
+        sessionStorage.removeItem(cacheKey);
+      } catch {}
+      loadFilteredRoutes(false);
+    };
+
+    window.addEventListener("rbac-permissions-updated", handlePermissionsUpdated);
+    return () => {
+      window.removeEventListener("rbac-permissions-updated", handlePermissionsUpdated);
+    };
   }, [user]);
 
   // Update open groups based on pathname
@@ -191,8 +219,12 @@ export default function Sidebar({
 
   const handleSignOut = async () => {
     try {
-      await signOut({ redirect: false, callbackUrl: "/login" });
-      router.push("/login");
+      if (user?.id) {
+        sessionStorage.removeItem(`_cached_sidebar_routes_${user.id}`);
+      }
+      const target = (user as any)?.userType === "ADMIN" ? "/admin/login" : "/login";
+      await signOut({ redirect: false, callbackUrl: target });
+      router.push(target);
     } catch {
       router.push("/login");
     }
