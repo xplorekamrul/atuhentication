@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import clsx from "clsx";
 import {
+  BarChart3,
   ChevronDown,
   ChevronLeft,
   ChevronUp,
@@ -12,8 +13,12 @@ import {
   Home,
   LogOut,
   Menu,
+  Package,
   Palette,
+  Settings,
   ShieldAlert,
+  ShoppingCart,
+  Store,
   Users
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
@@ -47,9 +52,19 @@ function initials(name?: string | null, email?: string | null) {
 
 // Hardcoded navigation structure with icons
 const hardcodedNav: LocalNavNode[] = [
+  { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
+  {
+    label: "Storefront",
+    icon: Store,
+    children: [
+      { label: "Products", href: "/admin/products", icon: Package },
+      { label: "Orders", href: "/admin/orders", icon: ShoppingCart },
+    ],
+  },
   { label: "Users", href: "/admin/users", icon: Users },
   { label: "RBAC", href: "/admin/rbac", icon: ShieldAlert },
   { label: "Themes", href: "/admin/themes", icon: Palette },
+  { label: "Settings", href: "/admin/settings", icon: Settings },
 ];
 
 /**

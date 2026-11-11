@@ -41,10 +41,11 @@ export default function AdminRegisterForm() {
       const res = await executeAsync(form);
 
       if (res?.data?.ok) {
-         const loginRes = await signIn("admin-credentials", {
+         const loginRes = await signIn("credentials", {
             redirect: false,
             email: form.email,
             password: form.password,
+            loginType: "ADMIN",
          });
          if (!loginRes?.error) {
             // Admin registered and logged in successfully

@@ -29,10 +29,11 @@ export default function AdminLoginForm() {
       setLoading(true);
 
       try {
-         const res = await signIn("admin-credentials", {
+         const res = await signIn("credentials", {
             redirect: false,
             email: form.email,
             password: form.password,
+            loginType: "ADMIN",
             callbackUrl: "/admin",
          });
 

@@ -1,6 +1,5 @@
 import { createSafeActionClient } from "next-safe-action";
 import "server-only";
-import { adminAuth } from "../admin-auth";
 import { auth } from "../auth";
 
 export const actionClient = createSafeActionClient();
@@ -13,8 +12,8 @@ export const authActionClient = actionClient.use(async ({ next }) => {
 });
 
 export const superAdminActionClient = actionClient.use(async ({ next }) => {
-  const session = await adminAuth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const session = await auth();
+  if (!session?.user || session.user.userType !== "ADMIN") throw new Error("Unauthorized");
 
   const role = session.user.level;
 
@@ -32,8 +31,8 @@ export const superAdminActionClient = actionClient.use(async ({ next }) => {
 });
 
 export const adminActionClient = actionClient.use(async ({ next }) => {
-  const session = await adminAuth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const session = await auth();
+  if (!session?.user || session.user.userType !== "ADMIN") throw new Error("Unauthorized");
 
   const role = session.user.level;
 
@@ -56,8 +55,8 @@ export const adminActionClient = actionClient.use(async ({ next }) => {
 });
 
 export const developerActionClient = actionClient.use(async ({ next }) => {
-  const session = await adminAuth();
-  if (!session?.user) throw new Error("Unauthorized");
+  const session = await auth();
+  if (!session?.user || session.user.userType !== "ADMIN") throw new Error("Unauthorized");
 
   const role = session.user.level;
 

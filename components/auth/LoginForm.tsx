@@ -29,10 +29,30 @@ export default function LoginForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const getSafeRedirectUrl = (rawUrl: string | undefined, fallback: string) => {
+    if (!rawUrl || rawUrl === "/dashboard") return fallback;
+    try {
+      if (rawUrl.startsWith("/") && !rawUrl.startsWith("//")) {
+        return rawUrl;
+      }
+      if (typeof window !== "undefined") {
+        const parsed = new URL(rawUrl, window.location.origin);
+        if (parsed.origin === window.location.origin) {
+          return `${parsed.pathname}${parsed.search}`;
+        }
+      }
+    } catch {
+      // Invalid URL -> fall back
+    }
+    return fallback;
+  };
+
   // Redirect if already logged in
   useEffect(() => {
     if (session?.user) {
-      router.push(callbackUrl);
+      const userType = (session.user as any)?.userType;
+      const defaultTarget = userType === "ADMIN" ? "/admin" : "/";
+      router.push(getSafeRedirectUrl(callbackUrl, defaultTarget));
     }
   }, [session, router, callbackUrl]);
 
@@ -58,19 +78,18 @@ export default function LoginForm({
       }
 
       if (res?.ok) {
-        // Wait for session to be updated
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Check the updated session from /api/auth/session
+        const updatedSession = await fetch("/api/auth/session").then((r) => r.json()).catch(() => null);
 
-        // Get the updated session
-        const updatedSession = await fetch("/api/auth/session").then(r => r.json());
+        const isAdmin = isAdminLogin || updatedSession?.user?.userType === "ADMIN";
+        const defaultTarget = isAdmin ? "/admin" : "/";
+        const redirectUrl = getSafeRedirectUrl(callbackUrl, defaultTarget);
 
-        if (isAdminLogin || updatedSession?.user?.userType === "ADMIN") {
-          const redirectUrl = callbackUrl && callbackUrl !== "/dashboard" ? callbackUrl : "/admin";
-          router.push(redirectUrl);
-        } else {
-          const redirectUrl = callbackUrl === "/dashboard" ? "/" : callbackUrl;
-          router.push(redirectUrl);
-        }
+        // Full navigation ensures SessionProvider picks up the fresh cookie immediately
+        window.location.assign(redirectUrl);
+      } else {
+        setFormError("Unable to sign in. Please try again.");
+        setLoading(false);
       }
     } catch (err) {
       setFormError("Something went wrong.");
