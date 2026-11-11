@@ -201,7 +201,7 @@ export default function AdminRegisterForm() {
 
          <div className="text-center text-sm">
             <span className="text-muted-foreground">Already have an account? </span>
-            <a href="/admin/login" className="text-linkcolor hover:text-textcolor underline decoration-dotted">
+            <a href="/admin/login" className="text-primary hover:text-textcolor underline decoration-dotted">
                Sign in here
             </a>
          </div>

@@ -1,17 +1,21 @@
 "use client";
 
 import { listUsers } from "@/actions/users/list-users";
-import { Plus } from "lucide-react";
-import { useAction } from "next-safe-action/hooks";
-import { useEffect, useState, useMemo } from "react";
-import CreateUserDialog from "./dialogs/CreateUserDialog";
-import UserRowActions from "./UserRowActions";
-import { DataTable, ColumnDef } from "@/components/shared/data-table";
+import { ColumnDef, DataTable } from "@/components/shared/data-table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Search } from "lucide-react";
+import { useAction } from "next-safe-action/hooks";
+import { useEffect, useMemo, useRef, useState } from "react";
+import UserRowActions from "./UserRowActions";
+import CreateNormalUserDialog from "./dialogs/CreateNormalUserDialog";
+import CreateUserDialog from "./dialogs/CreateUserDialog";
 
-type User = {
+type AccountUser = {
   id: string;
   name: string | null;
+  username?: string | null;
   email: string | null;
   role: string | null;
   userType: "ADMIN" | "USER";
@@ -21,10 +25,15 @@ type User = {
 
 type UserStatusTab = "ALL" | "ACTIVE" | "INACTIVE" | "SUSPENDED";
 
-export default function UserTable() {
+export default function UserTable({
+  accountType = "ADMIN",
+}: {
+  accountType?: "ADMIN" | "USER";
+}) {
+  const isAdminTab = accountType === "ADMIN";
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<AccountUser[]>([]);
   const [total, setTotal] = useState(0);
   const [counts, setCounts] = useState({
     ALL: 0,
@@ -34,17 +43,20 @@ export default function UserTable() {
   });
   const [filterStatus, setFilterStatus] = useState<UserStatusTab>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [openCreate, setOpenCreate] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const requestIdRef = useRef(0);
 
   const { executeAsync: doList } = useAction(listUsers);
 
   async function loadUsers(
     targetPage = page,
     statusTab = filterStatus,
-    query = searchQuery,
+    query = debouncedQuery,
     targetPageSize = pageSize
   ) {
+    const reqId = ++requestIdRef.current;
     setIsLoading(true);
     try {
       const statuses =
@@ -55,9 +67,12 @@ export default function UserTable() {
       const result = await doList({
         page: targetPage,
         pageSize: targetPageSize,
-        q: query || undefined,
+        q: query.trim() || undefined,
         statuses,
+        userType: accountType,
       });
+
+      if (reqId !== requestIdRef.current) return;
 
       if (result?.data?.ok) {
         setUsers(result.data.items || []);
@@ -67,37 +82,46 @@ export default function UserTable() {
         }
       }
     } catch (error) {
-      console.error("Failed to load users:", error);
+      if (reqId !== requestIdRef.current) return;
+      console.error("Failed to load accounts:", error);
     } finally {
-      setIsLoading(false);
+      if (reqId === requestIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }
 
   useEffect(() => {
-    loadUsers(page, filterStatus, searchQuery, pageSize);
+    const trimmed = searchQuery.trim();
+    if (trimmed === debouncedQuery) return;
+
+    const timer = setTimeout(() => {
+      setPage(1);
+      setDebouncedQuery(trimmed);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, debouncedQuery]);
+
+  useEffect(() => {
+    loadUsers(page, filterStatus, debouncedQuery, pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, filterStatus, pageSize]);
+  }, [accountType, page, filterStatus, debouncedQuery, pageSize]);
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(1);
-    loadUsers(1, filterStatus, searchQuery, pageSize);
-  };
-
-  const getUserActionProps = (user: User) => {
+  const getUserActionProps = (user: AccountUser) => {
     const originalId = user.id.replace(/^(admin|user)-/, "");
     return {
       id: originalId,
       name: user.name,
       email: user.email || "",
-      role: (user.role || "ADMIN") as "DEVELOPER" | "SUPER_ADMIN" | "ADMIN",
-      userType: user.userType as "ADMIN" | "USER",
+      role: (user.role || null) as "DEVELOPER" | "SUPER_ADMIN" | "ADMIN" | null,
+      userType: user.userType,
       status: user.status as "ACTIVE" | "INACTIVE" | "SUSPENDED",
     };
   };
 
-  const columns: ColumnDef<User>[] = useMemo(
-    () => [
+  const columns: ColumnDef<AccountUser>[] = useMemo(() => {
+    const baseCols: ColumnDef<AccountUser>[] = [
       {
         header: "Name",
         accessorKey: "name",
@@ -109,6 +133,16 @@ export default function UserTable() {
         ),
       },
       {
+        header: "Username",
+        accessorKey: "username",
+        sortable: true,
+        cell: (user) => (
+          <span className="font-mono text-xs text-muted-foreground">
+            {user.username || "—"}
+          </span>
+        ),
+      },
+      {
         header: "Email",
         accessorKey: "email",
         sortable: true,
@@ -116,28 +150,22 @@ export default function UserTable() {
           <span className="text-muted-foreground">{user.email || "—"}</span>
         ),
       },
-      {
-        header: "Role",
+    ];
+
+    if (isAdminTab) {
+      baseCols.push({
+        header: "Admin Level",
         accessorKey: "role",
         sortable: true,
-        cell: (user) => user.role || "—",
-      },
-      {
-        header: "User Type",
-        accessorKey: "userType",
-        sortable: true,
         cell: (user) => (
-          <span
-            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-              user.userType === "ADMIN"
-                ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
-                : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
-            }`}
-          >
-            {user.userType}
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+            {user.role || "ADMIN"}
           </span>
         ),
-      },
+      });
+    }
+
+    baseCols.push(
       {
         header: "Status",
         accessorKey: "status",
@@ -146,10 +174,10 @@ export default function UserTable() {
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border ${
               user.status === "ACTIVE"
-                ? "border-emerald-600/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                ? "border-emerald-600/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                 : user.status === "SUSPENDED"
-                ? "border-red-600/30 bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300"
-                : "border-amber-600/30 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                ? "border-destructive/30 bg-destructive/10 text-destructive"
+                : "border-amber-600/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
             }`}
           >
             {user.status}
@@ -187,15 +215,18 @@ export default function UserTable() {
           <div className="flex justify-end">
             <UserRowActions
               user={getUserActionProps(user)}
-              onChanged={() => loadUsers(page, filterStatus, searchQuery, pageSize)}
+              onChanged={() =>
+                loadUsers(page, filterStatus, debouncedQuery, pageSize)
+              }
             />
           </div>
         ),
-      },
-    ],
+      }
+    );
+
+    return baseCols;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [page, filterStatus, searchQuery, pageSize]
-  );
+  }, [isAdminTab, page, filterStatus, debouncedQuery, pageSize]);
 
   return (
     <div className="space-y-4">
@@ -204,6 +235,7 @@ export default function UserTable() {
         onValueChange={(val) => {
           setFilterStatus(val as UserStatusTab);
           setSearchQuery("");
+          setDebouncedQuery("");
           setPage(1);
         }}
         className="w-full gap-0"
@@ -214,8 +246,8 @@ export default function UserTable() {
               value="ALL"
               className="bg-transparent text-foreground/70 data-[state=active]:text-primary data-[state=active]:bg-card rounded-t-sm flex items-center gap-x-2 font-medium data-[state=active]:shadow-none pb-2"
             >
-              All Users
-              <span className="inline-flex items-center justify-center min-w-6 h-6 px-1.5 text-xs font-semibold rounded-lg border border-primary/10 text-foreground bg-primary/10 hover:bg-primary/40">
+              {isAdminTab ? "All Admins" : "All Users"}
+              <span className="inline-flex items-center justify-center min-w-6 h-6 px-1.5 text-xs font-semibold rounded-lg border border-primary/10 text-foreground bg-primary/10">
                 {counts.ALL}
               </span>
             </TabsTrigger>
@@ -224,7 +256,7 @@ export default function UserTable() {
               className="bg-transparent text-foreground/70 data-[state=active]:text-primary data-[state=active]:bg-card rounded-t-sm flex items-center gap-x-2 font-medium data-[state=active]:shadow-none pb-2"
             >
               Active
-              <span className="inline-flex items-center justify-center min-w-6 h-6 px-1.5 text-xs font-semibold rounded-lg border border-primary/10 text-foreground bg-primary/10 hover:bg-primary/40">
+              <span className="inline-flex items-center justify-center min-w-6 h-6 px-1.5 text-xs font-semibold rounded-lg border border-primary/10 text-foreground bg-primary/10">
                 {counts.ACTIVE}
               </span>
             </TabsTrigger>
@@ -233,7 +265,7 @@ export default function UserTable() {
               className="bg-transparent text-foreground/70 data-[state=active]:text-primary data-[state=active]:bg-card rounded-t-sm flex items-center gap-x-2 font-medium data-[state=active]:shadow-none pb-2"
             >
               Inactive
-              <span className="inline-flex items-center justify-center min-w-6 h-6 px-1.5 text-xs font-semibold rounded-lg border border-primary/10 text-foreground bg-primary/10 hover:bg-primary/40">
+              <span className="inline-flex items-center justify-center min-w-6 h-6 px-1.5 text-xs font-semibold rounded-lg border border-primary/10 text-foreground bg-primary/10">
                 {counts.INACTIVE}
               </span>
             </TabsTrigger>
@@ -242,35 +274,38 @@ export default function UserTable() {
               className="bg-transparent text-foreground/70 data-[state=active]:text-primary data-[state=active]:bg-card rounded-t-sm flex items-center gap-x-2 font-medium data-[state=active]:shadow-none pb-2"
             >
               Suspended
-              <span className="inline-flex items-center justify-center min-w-6 h-6 px-1.5 text-xs font-semibold rounded-lg border border-primary/10 text-foreground bg-primary/10 hover:bg-primary/40">
+              <span className="inline-flex items-center justify-center min-w-6 h-6 px-1.5 text-xs font-semibold rounded-lg border border-primary/10 text-foreground bg-primary/10">
                 {counts.SUSPENDED}
               </span>
             </TabsTrigger>
           </div>
 
           <div className="flex items-center justify-end gap-2 mr-2 my-1">
-            <form onSubmit={handleSearchSubmit} className="flex gap-2">
-              <input
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
                 type="text"
-                placeholder="Search name, email..."
+                placeholder={
+                  isAdminTab
+                    ? "Search admin name, email..."
+                    : "Search user name, email..."
+                }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="px-3 py-1 border rounded-sm text-sm w-48 sm:w-64 bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="h-8 text-sm w-48 sm:w-64 pl-8 bg-background"
+                aria-label={isAdminTab ? "Search admins" : "Search users"}
               />
-              <button
-                type="submit"
-                className="px-3 py-1 bg-primary text-primary-foreground rounded-sm text-sm font-medium hover:opacity-90 transition-opacity shadow-sm cursor-pointer"
-              >
-                Search
-              </button>
-            </form>
+            </div>
 
-            <button
+            <Button
+              type="button"
+              size="sm"
               onClick={() => setOpenCreate(true)}
-              className="inline-flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-3 py-1 text-sm font-medium hover:opacity-90 transition-opacity shadow-sm cursor-pointer whitespace-nowrap"
+              className="h-8 whitespace-nowrap"
             >
-              <Plus className="h-4 w-4" /> Add User
-            </button>
+              <Plus className="h-4 w-4" />
+              {isAdminTab ? "Add Admin" : "Add User"}
+            </Button>
           </div>
         </TabsList>
 
@@ -282,10 +317,16 @@ export default function UserTable() {
                 columns={columns}
                 keyExtractor={(u) => u.id}
                 isLoading={isLoading}
-                emptyMessage="No users match your filters."
+                emptyMessage={
+                  isAdminTab
+                    ? "No admins match your filters."
+                    : "No users match your filters."
+                }
                 enableColumnResizing={true}
                 enableRowResizing={true}
-                tableId="admin-users-table"
+                tableId={
+                  isAdminTab ? "admin-accounts-table" : "normal-users-table"
+                }
                 pagination={{
                   page,
                   total,
@@ -294,22 +335,33 @@ export default function UserTable() {
                   onPageSizeChange: (newPageSize) => {
                     setPageSize(newPageSize);
                     setPage(1);
-                    loadUsers(1, filterStatus, searchQuery, newPageSize);
                   },
                   pageSizeOptions: [10, 20, 50, 100],
                 }}
-                className="rounded-t-none border-t-0"
+                className="rounded-t-none border-t-0 h-[500px]"
               />
             </TabsContent>
           )
         )}
       </Tabs>
 
-      <CreateUserDialog
-        open={openCreate}
-        onOpenChange={setOpenCreate}
-        onCreated={() => loadUsers(page, filterStatus, searchQuery, pageSize)}
-      />
+      {isAdminTab ? (
+        <CreateUserDialog
+          open={openCreate}
+          onOpenChange={setOpenCreate}
+          onCreated={() =>
+            loadUsers(page, filterStatus, debouncedQuery, pageSize)
+          }
+        />
+      ) : (
+        <CreateNormalUserDialog
+          open={openCreate}
+          onOpenChange={setOpenCreate}
+          onCreated={() =>
+            loadUsers(page, filterStatus, debouncedQuery, pageSize)
+          }
+        />
+      )}
     </div>
   );
 }

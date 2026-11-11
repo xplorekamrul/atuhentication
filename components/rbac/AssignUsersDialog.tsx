@@ -58,7 +58,7 @@ export default function AssignUsersDialog({
     startTransition(async () => {
       const [assignedResult, availableResult] = await Promise.all([
         doListRoleUsers({ roleId: String(role.id), page: 1, pageSize: 100 }),
-        doListUsers({ page: 1, pageSize: 100 }),
+        doListUsers({ page: 1, pageSize: 100, userType: "ADMIN" }),
       ]);
 
       if (assignedResult?.data?.ok) {

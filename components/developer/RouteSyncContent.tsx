@@ -3,9 +3,9 @@
 import { getAllRoutesAndGroups, syncRoutesToDatabase } from "@/actions/rbac/sync-routes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
 import { AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
+import { toast } from "sonner";
 
 interface Route {
    id: string;
@@ -100,7 +100,7 @@ export function RouteSyncContent() {
          {/* Sync Button Card */}
          <Card className="bg-card border-border">
             <CardHeader>
-               <CardTitle className="text-lg font-semibold text-tcolor">
+               <CardTitle className="text-lg font-semibold text-primary">
                   Route Synchronization
                </CardTitle>
             </CardHeader>
@@ -112,7 +112,7 @@ export function RouteSyncContent() {
                <Button
                   onClick={handleSync}
                   disabled={isPending}
-                  className="inline-flex items-center gap-2 rounded-md px-4 py-2 bg-primary text-primary-foreground hover:bg-scolor transition text-sm font-medium"
+                  className="inline-flex items-center gap-2 rounded-md px-4 py-2 bg-primary text-primary-foreground hover:bg-primary transition text-sm font-medium"
                >
                   <RefreshCw className={`h-4 w-4 ${isPending ? "animate-spin" : ""}`} />
                   {isPending ? "Syncing..." : "Sync Routes"}
@@ -154,7 +154,7 @@ export function RouteSyncContent() {
          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card className="bg-card border-border">
                <CardHeader>
-                  <CardTitle className="text-base font-semibold text-tcolor">
+                  <CardTitle className="text-base font-semibold text-primary">
                      Route Groups
                   </CardTitle>
                </CardHeader>
@@ -190,7 +190,7 @@ export function RouteSyncContent() {
             {/* Statistics */}
             <Card className="bg-card border-border">
                <CardHeader>
-                  <CardTitle className="text-base font-semibold text-tcolor">
+                  <CardTitle className="text-base font-semibold text-primary">
                      Statistics
                   </CardTitle>
                </CardHeader>
@@ -228,7 +228,7 @@ export function RouteSyncContent() {
          {/* Routes Table */}
          <Card className="bg-card border-border ">
             <CardHeader>
-               <CardTitle className="text-lg font-semibold text-tcolor">
+               <CardTitle className="text-lg font-semibold text-primary">
                   All Routes ({routes.length})
                </CardTitle>
             </CardHeader>
@@ -236,7 +236,7 @@ export function RouteSyncContent() {
                <div className="overflow-x-auto rounded-lg border border-border h-screen overflow-y-auto">
                   <table className="min-w-full text-sm">
                      <thead className="bg-muted">
-                        <tr className="text-left text-text-hcolor">
+                        <tr className="text-left text-text-accent">
                            <th className="px-4 py-3">Path</th>
                            <th className="px-4 py-3">Name</th>
                            <th className="px-4 py-3">Route Group</th>

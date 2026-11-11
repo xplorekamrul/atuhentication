@@ -1,29 +1,52 @@
 "use client";
 
 import { updateUserInfo } from "@/actions/users/update-user-info";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useAction } from "next-safe-action/hooks";
-import { useEffect, useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { toast } from "sonner";
+
+type EditUser = {
+  id: string;
+  name: string | null;
+  email: string;
+  userType?: "ADMIN" | "USER";
+};
 
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  user: { id: string; name: string | null; email: string; userType?: "ADMIN" | "USER" };
+  user: EditUser;
   onSaved: () => void;
 };
 
-export default function EditInfoDialog({ open, onOpenChange, user, onSaved }: Props) {
+function EditInfoForm({
+  user,
+  onClose,
+  onSaved,
+}: {
+  user: EditUser;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const nameId = useId();
+  const emailId = useId();
   const [name, setName] = useState(user.name ?? "");
   const [email, setEmail] = useState(user.email);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setName(user.name ?? "");
-    setEmail(user.email);
-    setServerError(null);
-  }, [user, open]);
-
   const { executeAsync, result, status } = useAction(updateUserInfo);
+
   const fieldErrors = useMemo(() => {
     const errs = (result?.validationErrors ?? {}) as Record<string, string[] | undefined>;
     return { name: errs?.name?.[0], email: errs?.email?.[0] };
@@ -36,7 +59,7 @@ export default function EditInfoDialog({ open, onOpenChange, user, onSaved }: Pr
     if (res?.data?.ok) {
       toast.success("User info updated successfully");
       onSaved();
-      onOpenChange(false);
+      onClose();
     } else {
       const errorMsg = res?.data?.message ?? res?.serverError ?? "Failed to update user info";
       setServerError(errorMsg);
@@ -44,59 +67,86 @@ export default function EditInfoDialog({ open, onOpenChange, user, onSaved }: Pr
     }
   }
 
-  if (!open) return null;
   return (
-    <div className="fixed inset-0 z-30 grid place-items-center bg-black/40 p-4 text-left">
-      <form onSubmit={submit} className="w-full max-w-md rounded-xl border border-border bg-background p-4 shadow-xl">
-        <h3 className="text-lg font-semibold mb-3">Edit Info</h3>
-        <div className="space-y-3">
-          <div>
-            <label className="text-sm">Name</label>
-            <input
-              className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (serverError) setServerError(null);
-              }}
-              aria-invalid={!!fieldErrors.name}
-            />
-            {fieldErrors.name ? <p className="text-xs text-destructive mt-1">{fieldErrors.name}</p> : null}
-          </div>
-          <div>
-            <label className="text-sm">Email</label>
-            <input
-              className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2"
-              type="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (serverError) setServerError(null);
-              }}
-              aria-invalid={!!fieldErrors.email}
-            />
-            {fieldErrors.email ? <p className="text-xs text-destructive mt-1">{fieldErrors.email}</p> : null}
-          </div>
-          {serverError ? <p className="text-sm text-destructive">{serverError}</p> : null}
-        </div>
+    <form onSubmit={submit} className="space-y-4">
+      <div className="space-y-1.5">
+        <Label htmlFor={nameId}>Name</Label>
+        <Input
+          id={nameId}
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (serverError) setServerError(null);
+          }}
+          placeholder="Full name"
+          aria-invalid={!!fieldErrors.name}
+          required
+        />
+        {fieldErrors.name ? (
+          <p className="text-xs text-destructive">{fieldErrors.name}</p>
+        ) : null}
+      </div>
 
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            className="rounded-md border border-border px-3 py-2 text-sm"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={status === "executing"}
-            className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-60"
-          >
-            {status === "executing" ? "Saving..." : "Save"}
-          </button>
-        </div>
-      </form>
-    </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={emailId}>Email</Label>
+        <Input
+          id={emailId}
+          type="email"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            if (serverError) setServerError(null);
+          }}
+          placeholder="name@example.com"
+          aria-invalid={!!fieldErrors.email}
+          required
+        />
+        {fieldErrors.email ? (
+          <p className="text-xs text-destructive">{fieldErrors.email}</p>
+        ) : null}
+      </div>
+
+      {serverError ? (
+        <p className="text-sm text-destructive">{serverError}</p>
+      ) : null}
+
+      <DialogFooter className="pt-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onClose}
+          disabled={status === "executing"}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" disabled={status === "executing"}>
+          {status === "executing" ? "Saving..." : "Save"}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+export default function EditInfoDialog({ open, onOpenChange, user, onSaved }: Props) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Info</DialogTitle>
+          <DialogDescription>
+            Update {user.userType === "ADMIN" ? "admin" : "user"} name and email address.
+          </DialogDescription>
+        </DialogHeader>
+
+        {open ? (
+          <EditInfoForm
+            key={user.id}
+            user={user}
+            onClose={() => onOpenChange(false)}
+            onSaved={onSaved}
+          />
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }

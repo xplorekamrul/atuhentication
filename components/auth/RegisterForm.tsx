@@ -167,7 +167,7 @@ export default function RegisterForm() {
             onClick={() => setShowPw((v) => !v)}
             className="
               absolute inset-y-0 right-2 my-auto inline-flex h-8 w-8 items-center justify-center
-              rounded-md text-muted-foreground hover:text-hcolor
+              rounded-md text-muted-foreground hover:text-accent
               focus:outline-none focus:ring-2 focus:ring-sidebar-ring
             "
             aria-label={showPw ? "Hide password" : "Show password"}
@@ -212,7 +212,7 @@ export default function RegisterForm() {
 
       <p className="text-sm text-center text-muted-foreground">
         Already have an account?{" "}
-        <a href="/login" className="underline decoration-dotted text-linkcolor hover:text-hcolor">
+        <a href="/login" className="underline decoration-dotted text-primary hover:text-accent">
           Login
         </a>
       </p>

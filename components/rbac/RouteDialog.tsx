@@ -335,7 +335,7 @@ export default function RouteDialog({
                   <Button
                      type="submit"
                      disabled={isPending}
-                     className="bg-primary text-primary-foreground hover:bg-scolor"
+                     className="bg-primary text-primary-foreground hover:bg-primary"
                   >
                      {isPending ? "Saving..." : route ? "Update" : "Create"}
                   </Button>

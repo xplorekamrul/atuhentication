@@ -19,7 +19,7 @@ type Props = {
     id: string;
     name: string | null;
     email: string;
-    role: Role;
+    role: Role | null;
     userType?: "ADMIN" | "USER";
     status: Status;
   };

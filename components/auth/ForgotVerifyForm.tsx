@@ -69,7 +69,7 @@ export default function ForgotVerifyForm({ defaultEmail = "" }: { defaultEmail?:
       <button
         type="submit"
         disabled={status === "executing"}
-        className="w-full rounded-lg bg-primary text-white py-2.5 hover:bg-scolor transition-colors disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sidebar-ring"
+        className="w-full rounded-lg bg-primary text-white py-2.5 hover:bg-primary transition-colors disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sidebar-ring"
       >
         {status === "executing" ? "Verifying…" : "Verify"}
       </button>

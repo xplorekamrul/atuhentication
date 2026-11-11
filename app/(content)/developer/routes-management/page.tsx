@@ -22,8 +22,8 @@ export default async function DeveloperPage() {
    return (
       <main className="p-4 sm:p-6 space-y-6">
          <div>
-            <h1 className="text-3xl font-bold text-tcolor"> Route synchronization and management</h1>
-           
+            <h1 className="text-3xl font-bold text-primary"> Route synchronization and management</h1>
+
          </div>
 
          <RouteSyncContent />

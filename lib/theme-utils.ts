@@ -80,11 +80,6 @@ export function generateThemeCSS(themeColors: Record<string, string>) {
     "--secondary-foreground": "#ffffff",
     "--accent": accentInput,
     "--accent-foreground": "#ffffff",
-    "--hcolor": secondaryInput,
-    "--scolor": primaryInput,
-    "--tcolor": secondaryInput,
-    "--greencolor": primaryInput,
-    "--linkcolor": `hsl(${h}, ${Math.min(s, 35)}%, 35%)`,
 
     "--background": `hsl(${h}, ${Math.min(s, 20)}%, 98%)`,
     "--foreground": `hsl(${h}, ${s}%, 10%)`,
@@ -116,11 +111,6 @@ export function generateThemeCSS(themeColors: Record<string, string>) {
     "--color-secondary-foreground": "#ffffff",
     "--color-accent": accentInput,
     "--color-accent-foreground": "#ffffff",
-    "--color-hcolor": secondaryInput,
-    "--color-scolor": primaryInput,
-    "--color-tcolor": secondaryInput,
-    "--color-greencolor": primaryInput,
-    "--color-linkcolor": `hsl(${h}, ${Math.min(s, 35)}%, 35%)`,
     "--color-light": `hsl(${h}, ${Math.min(s, 20)}%, 95%)`,
 
     "--color-background": `hsl(${h}, ${Math.min(s, 20)}%, 98%)`,
@@ -154,11 +144,7 @@ export function generateThemeCSS(themeColors: Record<string, string>) {
     "--secondary-foreground": "#ffffff",
     "--accent": accentInput,
     "--accent-foreground": "#ffffff",
-    "--hcolor": darkHeadingColor,
-    "--scolor": primaryInput,
-    "--tcolor": darkHeadingColor,
-    "--greencolor": primaryInput,
-    "--linkcolor": `hsl(${h}, ${Math.min(s, 40)}%, 72%)`,
+
 
     "--background": `hsl(${h}, ${Math.min(s, 15)}%, 7%)`,
     "--foreground": `hsl(${h}, ${Math.min(s, 10)}%, 98%)`,
@@ -190,11 +176,6 @@ export function generateThemeCSS(themeColors: Record<string, string>) {
     "--color-secondary-foreground": "#ffffff",
     "--color-accent": accentInput,
     "--color-accent-foreground": "#ffffff",
-    "--color-hcolor": darkHeadingColor,
-    "--color-scolor": primaryInput,
-    "--color-tcolor": darkHeadingColor,
-    "--color-greencolor": primaryInput,
-    "--color-linkcolor": `hsl(${h}, ${Math.min(s, 40)}%, 72%)`,
     "--color-light": `hsl(${h}, ${Math.min(s, 15)}%, 12%)`,
 
     "--color-background": `hsl(${h}, ${Math.min(s, 15)}%, 7%)`,

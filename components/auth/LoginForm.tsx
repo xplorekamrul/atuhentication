@@ -127,7 +127,7 @@ export default function LoginForm({
           <div>
             <Link
               href="/forgot"
-              className="text-sm text-linkcolor hover:text-hcolor underline decoration-dotted"
+              className="text-sm text-primary hover:text-accent underline decoration-dotted"
             >
               Forgot password?
             </Link>
@@ -154,7 +154,7 @@ export default function LoginForm({
             onClick={() => setShowPw((v) => !v)}
             className="
               absolute inset-y-0 right-2 my-auto inline-flex h-8 w-8 items-center justify-center
-              rounded-md text-muted-foreground hover:text-hcolor
+              rounded-md text-muted-foreground hover:text-accent
               focus:outline-none focus:ring-2 focus:ring-sidebar-ring
             "
             aria-label={showPw ? "Hide password" : "Show password"}
@@ -197,7 +197,7 @@ export default function LoginForm({
       {showRegisterLink && (
         <p className="text-sm text-center text-muted-foreground">
           No account?{" "}
-          <a href="/register" className="underline decoration-dotted text-linkcolor hover:text-hcolor">
+          <a href="/register" className="underline decoration-dotted text-primary hover:text-accent">
             Register
           </a>
         </p>

@@ -98,7 +98,7 @@ export default function ForgotResetForm() {
             onClick={() => setShowPw((v) => !v)}
             className="
               absolute inset-y-0 right-2 my-auto inline-flex h-8 w-8 items-center justify-center
-              rounded-md text-muted-foreground hover:text-hcolor
+              rounded-md text-muted-foreground hover:text-accent
               focus:outline-none focus:ring-2 focus:ring-sidebar-ring
             "
             aria-label={showPw ? "Hide password" : "Show password"}
@@ -145,7 +145,7 @@ export default function ForgotResetForm() {
             onClick={() => setShowConfirm((v) => !v)}
             className="
               absolute inset-y-0 right-2 my-auto inline-flex h-8 w-8 items-center justify-center
-              rounded-md text-muted-foreground hover:text-hcolor
+              rounded-md text-muted-foreground hover:text-accent
               focus:outline-none focus:ring-2 focus:ring-sidebar-ring
             "
             aria-label={showConfirm ? "Hide confirm password" : "Show confirm password"}
@@ -167,7 +167,7 @@ export default function ForgotResetForm() {
       <button
         type="submit"
         disabled={status === "executing"}
-        className="w-full rounded-lg bg-primary text-white py-2.5 hover:bg-scolor transition-colors disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sidebar-ring"
+        className="w-full rounded-lg bg-primary text-white py-2.5 hover:bg-primary transition-colors disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sidebar-ring"
       >
         {status === "executing" ? "Updating…" : "Update password"}
       </button>

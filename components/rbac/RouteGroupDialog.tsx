@@ -125,7 +125,7 @@ export default function RouteGroupDialog({
                   <Button
                      type="submit"
                      disabled={isPending}
-                     className="bg-primary text-primary-foreground hover:bg-scolor"
+                     className="bg-primary text-primary-foreground hover:bg-primary"
                   >
                      {isPending ? "Saving..." : group ? "Update" : "Create"}
                   </Button>

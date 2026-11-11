@@ -140,7 +140,7 @@ export default function AdminLoginForm() {
 
          <div className="text-center text-sm">
             <span className="text-muted-foreground">Don't have an account? </span>
-            <Link href="/admin/register" className="text-linkcolor hover:text-textcolor underline decoration-dotted">
+            <Link href="/admin/register" className="text-primary hover:text-textcolor underline decoration-dotted">
                Register here
             </Link>
          </div>

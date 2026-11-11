@@ -11,6 +11,7 @@ export const userListSchema = z.object({
   q: z.string().trim().optional(),
   roles: z.array(roleEnum).optional(),
   statuses: z.array(statusEnum).optional(),
+  userType: userTypeEnum.optional(),
 });
 
 export type UserListQuery = z.infer<typeof userListSchema>;
@@ -21,6 +22,13 @@ export const createUserSchema = z.object({
   email: z.string().email().toLowerCase(),
   role: roleEnum,
   password: z.string().min(6),
+});
+
+export const createNormalUserSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters").max(80),
+  username: z.string().min(2, "Username must be at least 2 characters").max(50).transform((u) => u.trim()),
+  email: z.string().email("Invalid email").toLowerCase(),
+  password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
 export const updateUserInfoSchema = z.object({

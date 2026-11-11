@@ -178,7 +178,7 @@ export default function AssignRouteGroupsDialog({
                   <Button
                      type="submit"
                      disabled={isPending}
-                     className="bg-primary text-primary-foreground hover:bg-scolor"
+                     className="bg-primary text-primary-foreground hover:bg-primary"
                   >
                      {isPending ? "Assigning..." : "Assign"}
                   </Button>
