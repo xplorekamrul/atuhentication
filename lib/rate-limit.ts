@@ -1,8 +1,10 @@
 /**
  * Redis-backed distributed sliding-window & exponential backoff rate limiter
  * with automatic in-memory fallback when Redis is unavailable.
- * Supports progressive lockouts (1h -> 2h -> 4h -> 8h -> 16h -> 24h)
- * to stop high-speed bots, brute-force, and credential stuffing attacks.
+ *
+ * Supports two independent protection layers controlled via `.env`:
+ * 1. Auth Rate Limiter (`AUTH_RATELIMIT_ENABLED`): login burst, registration, OTP, and account lockouts (1h -> 24h)
+ * 2. Global Page Rate Limiter (`PAGE_RATELIMIT_ENABLED`): protects all pages in proxy.ts against bots (5m -> 24h escalation)
  */
 
 import {
@@ -21,7 +23,7 @@ interface RateLimitRecord {
 interface ExponentialLockoutRecord {
   failedAttempts: number;
   lockedUntil: number; // Unix timestamp in ms
-  tier: number;        // Escalation tier (1 = 1h, 2 = 2h, 3 = 4h, 4 = 8h, etc.)
+  tier: number;        // Escalation tier (1 = base, 2 = 2x, 3 = 4x, ...)
   lastAttemptAt: number;
 }
 
@@ -95,6 +97,22 @@ export interface ExponentialLockoutOptions {
   decaySeconds?: number;     // Reset record if inactive this long. Default: 24 * 3600
 }
 
+export interface PageRateLimitConfig {
+  maxRequests: number;
+  windowSeconds: number;
+  baseBlockSeconds: number;
+}
+
+export interface PageRateLimitResult {
+  allowed: boolean;
+  limit: number;
+  remaining: number;
+  resetInSeconds: number;
+  formattedDuration: string;
+  tier: number;
+  reason: "disabled" | "ok" | "active_block" | "window_exceeded";
+}
+
 function buildWindowRedisKey(key: string): string {
   return prefixRedisKey(`rl:win:${key}`);
 }
@@ -103,18 +121,50 @@ function buildExpRedisKey(key: string): string {
   return prefixRedisKey(`rl:exp:${key}`);
 }
 
-/**
- * Controlled by `.env` `RATELIMIT_ENABLED` ("true" / "false"). Defaults to true if omitted.
- */
-export function isRateLimitEnabled(): boolean {
-  const raw = process.env.RATELIMIT_ENABLED?.trim().toLowerCase();
-  if (!raw) return true;
+function parseEnvBoolean(rawValue: string | undefined, defaultValue: boolean): boolean {
+  const raw = rawValue?.trim().toLowerCase();
+  if (!raw) return defaultValue;
   return raw !== "false" && raw !== "0" && raw !== "no" && raw !== "off";
+}
+
+function parseEnvPositiveInt(rawValue: string | undefined, fallback: number): number {
+  const raw = rawValue?.trim();
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.floor(parsed);
+}
+
+/**
+ * Controlled by `.env` `AUTH_RATELIMIT_ENABLED` ("true" / "false"). Defaults to true.
+ */
+export function isAuthRateLimitEnabled(): boolean {
+  return parseEnvBoolean(process.env.AUTH_RATELIMIT_ENABLED, true);
+}
+
+/**
+ * Controlled by `.env` `PAGE_RATELIMIT_ENABLED` ("true" / "false"). Defaults to true.
+ */
+export function isPageRateLimitEnabled(): boolean {
+  return parseEnvBoolean(process.env.PAGE_RATELIMIT_ENABLED, true);
+}
+
+/**
+ * Read global page-wide rate limit policy from `.env` with safe standard defaults:
+ * - 60 page requests per 60-second window per IP
+ * - 300-second (5-minute) base block escalating up to 24 hours on persistent bot traffic
+ */
+export function getPageRateLimitConfig(): PageRateLimitConfig {
+  return {
+    maxRequests: parseEnvPositiveInt(process.env.PAGE_RATELIMIT_MAX_REQUESTS, 60),
+    windowSeconds: parseEnvPositiveInt(process.env.PAGE_RATELIMIT_WINDOW_SECONDS, 60),
+    baseBlockSeconds: parseEnvPositiveInt(process.env.PAGE_RATELIMIT_BLOCK_SECONDS, 300),
+  };
 }
 
 /**
  * Format duration in seconds to a human-readable English string.
- * Examples: "45 minutes", "1 hour", "2 hours", "4 hours", "8 hours"
+ * Examples: "5 minutes", "1 hour", "2 hours", "4 hours", "8 hours"
  */
 export function formatSecondsToHumanReadable(seconds: number): string {
   if (seconds <= 0) return "a moment";
@@ -165,19 +215,12 @@ async function writeExpRecord(
   expStore.set(key, record);
 }
 
-/**
- * Check if a key is currently under an active exponential lockout.
- */
-export async function checkExponentialLockout(key: string): Promise<{
+async function _checkExponentialLockout(key: string): Promise<{
   locked: boolean;
   resetInSeconds: number;
   formattedDuration: string;
   tier: number;
 }> {
-  if (!isRateLimitEnabled()) {
-    return { locked: false, resetInSeconds: 0, formattedDuration: "", tier: 0 };
-  }
-
   const now = Date.now();
   const record = await readExpRecord(key);
 
@@ -199,16 +242,7 @@ export async function checkExponentialLockout(key: string): Promise<{
   };
 }
 
-/**
- * Record a failed attempt under exponential backoff.
- * When threshold is hit or exceeded:
- * - 1st lockout: 1 hour (baseLockSeconds)
- * - 2nd lockout / attempt: 2 hours (1h * 2)
- * - 3rd lockout / attempt: 4 hours (2h * 2)
- * - 4th lockout / attempt: 8 hours (4h * 2)
- * - Capped at maxLockSeconds (24 hours)
- */
-export async function recordExponentialFailure(
+async function _recordExponentialFailure(
   key: string,
   options: ExponentialLockoutOptions
 ): Promise<{
@@ -217,17 +251,8 @@ export async function recordExponentialFailure(
   formattedDuration: string;
   attempts: number;
   threshold: number;
+  tier: number;
 }> {
-  if (!isRateLimitEnabled()) {
-    return {
-      locked: false,
-      resetInSeconds: 0,
-      formattedDuration: "",
-      attempts: 0,
-      threshold: options.threshold,
-    };
-  }
-
   const now = Date.now();
   const baseSeconds = options.baseLockSeconds ?? 3600;
   const maxSeconds = options.maxLockSeconds ?? 24 * 3600;
@@ -265,6 +290,7 @@ export async function recordExponentialFailure(
       formattedDuration: formatSecondsToHumanReadable(lockDurationSeconds),
       attempts: record.failedAttempts,
       threshold: options.threshold,
+      tier: record.tier,
     };
   }
 
@@ -275,14 +301,11 @@ export async function recordExponentialFailure(
     formattedDuration: "",
     attempts: record.failedAttempts,
     threshold: options.threshold,
+    tier: record.tier,
   };
 }
 
-/**
- * If an attacker continues spamming attempts while ALREADY locked out,
- * penalizes immediately by doubling their lock duration (1h -> 2h -> 4h -> 8h -> 24h).
- */
-export async function recordSpamWhileLocked(
+async function _recordSpamWhileLocked(
   key: string,
   options: ExponentialLockoutOptions
 ): Promise<{
@@ -290,10 +313,6 @@ export async function recordSpamWhileLocked(
   formattedDuration: string;
   tier: number;
 }> {
-  if (!isRateLimitEnabled()) {
-    return { resetInSeconds: 0, formattedDuration: "", tier: 0 };
-  }
-
   const now = Date.now();
   const baseSeconds = options.baseLockSeconds ?? 3600;
   const maxSeconds = options.maxLockSeconds ?? 24 * 3600;
@@ -331,37 +350,10 @@ export async function recordSpamWhileLocked(
   };
 }
 
-/**
- * Reset exponential lockout record (e.g. after successful login or password reset).
- */
-export async function resetExponentialLockout(key: string): Promise<void> {
-  expStore.delete(key);
-
-  const redis = await getReadyRedisClient();
-  if (!redis) return;
-
-  try {
-    await redis.unlink(buildExpRedisKey(key));
-  } catch (err: unknown) {
-    try {
-      await redis.del(buildExpRedisKey(key));
-    } catch {
-      markRedisOffline(getErrorMessage(err, "Redis exp delete failed"));
-    }
-  }
-}
-
-/**
- * Standard sliding-window rate limit check without incrementing.
- */
-export async function isRateLimited(
+async function _isRateLimited(
   key: string,
   limit: number
 ): Promise<{ limited: boolean; remaining: number; resetInSeconds: number }> {
-  if (!isRateLimitEnabled()) {
-    return { limited: false, remaining: limit, resetInSeconds: 0 };
-  }
-
   const redis = await getReadyRedisClient();
   if (redis) {
     try {
@@ -405,22 +397,11 @@ export async function isRateLimited(
   };
 }
 
-/**
- * Atomic window increment using Redis Lua script (with in-memory fallback).
- */
-export async function incrementRateLimit(
+async function _incrementRateLimit(
   key: string,
   limit: number,
   windowSeconds: number
 ): Promise<RateLimitResult> {
-  if (!isRateLimitEnabled()) {
-    return {
-      success: true,
-      remaining: limit,
-      resetInSeconds: windowSeconds,
-    };
-  }
-
   const redis = await getReadyRedisClient();
   if (redis) {
     try {
@@ -487,6 +468,97 @@ export async function incrementRateLimit(
 }
 
 /**
+ * Auth Rate Limiter: Check if an auth key is under an active exponential lockout.
+ */
+export async function checkExponentialLockout(key: string) {
+  if (!isAuthRateLimitEnabled()) {
+    return { locked: false, resetInSeconds: 0, formattedDuration: "", tier: 0 };
+  }
+  return _checkExponentialLockout(key);
+}
+
+/**
+ * Auth Rate Limiter: Record failed auth attempt with exponential backoff (1h -> 2h -> 4h -> ... -> 24h).
+ */
+export async function recordExponentialFailure(
+  key: string,
+  options: ExponentialLockoutOptions
+) {
+  if (!isAuthRateLimitEnabled()) {
+    return {
+      locked: false,
+      resetInSeconds: 0,
+      formattedDuration: "",
+      attempts: 0,
+      threshold: options.threshold,
+      tier: 0,
+    };
+  }
+  return _recordExponentialFailure(key, options);
+}
+
+/**
+ * Auth Rate Limiter: Double lock duration when spamming auth while already locked.
+ */
+export async function recordSpamWhileLocked(
+  key: string,
+  options: ExponentialLockoutOptions
+) {
+  if (!isAuthRateLimitEnabled()) {
+    return { resetInSeconds: 0, formattedDuration: "", tier: 0 };
+  }
+  return _recordSpamWhileLocked(key, options);
+}
+
+/**
+ * Reset exponential lockout record (e.g. after successful login or password reset).
+ */
+export async function resetExponentialLockout(key: string): Promise<void> {
+  expStore.delete(key);
+
+  const redis = await getReadyRedisClient();
+  if (!redis) return;
+
+  try {
+    await redis.unlink(buildExpRedisKey(key));
+  } catch (err: unknown) {
+    try {
+      await redis.del(buildExpRedisKey(key));
+    } catch {
+      markRedisOffline(getErrorMessage(err, "Redis exp delete failed"));
+    }
+  }
+}
+
+/**
+ * Auth Rate Limiter: Check sliding-window status without incrementing.
+ */
+export async function isRateLimited(key: string, limit: number) {
+  if (!isAuthRateLimitEnabled()) {
+    return { limited: false, remaining: limit, resetInSeconds: 0 };
+  }
+  return _isRateLimited(key, limit);
+}
+
+/**
+ * Auth Rate Limiter: Atomic sliding-window increment via Redis Lua.
+ */
+export async function incrementRateLimit(
+  key: string,
+  limit: number,
+  windowSeconds: number
+): Promise<RateLimitResult> {
+  if (!isAuthRateLimitEnabled()) {
+    return {
+      success: true,
+      remaining: limit,
+      resetInSeconds: windowSeconds,
+    };
+  }
+  return _incrementRateLimit(key, limit, windowSeconds);
+}
+
+/**
  * Clear sliding-window rate limit key.
  */
 export async function resetRateLimit(key: string): Promise<void> {
@@ -504,6 +576,86 @@ export async function resetRateLimit(key: string): Promise<void> {
       markRedisOffline(getErrorMessage(err, "Redis window reset failed"));
     }
   }
+}
+
+/**
+ * Global Page Rate Limiter (used across all pages in proxy.ts):
+ * Enforces a standard request budget per IP per window across all routes.
+ * On excess traffic / bot scraping:
+ * - 1st violation: blocks IP for `baseBlockSeconds` (default 300s / 5 minutes)
+ * - Persistent requests while blocked or repeat breaches: escalates exponentially (5m -> 10m -> 20m -> ... -> 24h max)
+ */
+export async function enforcePageRateLimit(ip: string): Promise<PageRateLimitResult> {
+  const config = getPageRateLimitConfig();
+
+  if (!isPageRateLimitEnabled()) {
+    return {
+      allowed: true,
+      limit: config.maxRequests,
+      remaining: config.maxRequests,
+      resetInSeconds: 0,
+      formattedDuration: "",
+      tier: 0,
+      reason: "disabled",
+    };
+  }
+
+  const lockKey = `page:lock:ip:${ip}`;
+  const windowKey = `page:win:ip:${ip}`;
+
+  const activeLock = await _checkExponentialLockout(lockKey);
+  if (activeLock.locked) {
+    const escalated = await _recordSpamWhileLocked(lockKey, {
+      threshold: 1,
+      baseLockSeconds: config.baseBlockSeconds,
+      maxLockSeconds: 24 * 3600,
+    });
+
+    return {
+      allowed: false,
+      limit: config.maxRequests,
+      remaining: 0,
+      resetInSeconds: escalated.resetInSeconds,
+      formattedDuration: escalated.formattedDuration,
+      tier: escalated.tier,
+      reason: "active_block",
+    };
+  }
+
+  const windowRes = await _incrementRateLimit(
+    windowKey,
+    config.maxRequests,
+    config.windowSeconds
+  );
+
+  if (!windowRes.success) {
+    const locked = await _recordExponentialFailure(lockKey, {
+      threshold: 1,
+      baseLockSeconds: config.baseBlockSeconds,
+      maxLockSeconds: 24 * 3600,
+    });
+    await resetRateLimit(windowKey);
+
+    return {
+      allowed: false,
+      limit: config.maxRequests,
+      remaining: 0,
+      resetInSeconds: locked.resetInSeconds,
+      formattedDuration: locked.formattedDuration,
+      tier: locked.tier,
+      reason: "window_exceeded",
+    };
+  }
+
+  return {
+    allowed: true,
+    limit: config.maxRequests,
+    remaining: windowRes.remaining,
+    resetInSeconds: windowRes.resetInSeconds,
+    formattedDuration: "",
+    tier: activeLock.tier,
+    reason: "ok",
+  };
 }
 
 /**

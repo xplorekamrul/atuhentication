@@ -1,11 +1,15 @@
+import ClearRedisCacheButton from "@/components/admin/ClearRedisCacheButton";
 import { Card } from "@/components/ui/card";
 
 export default function SuperAdminDashboard() {
    return (
       <div className="space-y-6">
-         <div>
-            <h1 className="text-3xl font-bold tracking-tight">Super Admin Dashboard</h1>
-            <p className="text-muted-foreground mt-2">Manage all system resources and configurations</p>
+         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+               <h1 className="text-3xl font-bold tracking-tight">Super Admin Dashboard</h1>
+               <p className="text-muted-foreground mt-2">Manage all system resources and configurations</p>
+            </div>
+            <ClearRedisCacheButton />
          </div>
 
          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

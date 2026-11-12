@@ -41,7 +41,15 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 REDIS_URL="redis://localhost:6379"
 REDIS_PREFIX="authapp:"
 DEFAULT_REDIS_CACHE_TTL_SECONDS=3600
-RATELIMIT_ENABLED=true
+# Auth rate limiter (login, registration, OTP, brute-force account lockouts)
+AUTH_RATELIMIT_ENABLED=true
+# Global page-wide rate limiter in proxy.ts (stops scraping & page-flooding bots)
+PAGE_RATELIMIT_ENABLED=true
+PAGE_RATELIMIT_MAX_REQUESTS=60
+PAGE_RATELIMIT_WINDOW_SECONDS=60
+PAGE_RATELIMIT_BLOCK_SECONDS=300
+# Optional deploy hook secret (min 16 chars) for CI/CD calls to POST /api/admin/cache/invalidate
+# CACHE_INVALIDATION_SECRET="change-this-to-a-long-random-secret"
 
 # ---------- OAuth Credentials ----------
 # Get from https://console.cloud.google.com/apis/credentials

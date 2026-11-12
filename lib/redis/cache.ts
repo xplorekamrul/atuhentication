@@ -1,6 +1,8 @@
+import type Redis from "ioredis";
 import {
   getErrorMessage,
   getReadyRedisClient,
+  getRedisKeyPrefix,
   markRedisOffline,
   onRedisReady,
   prefixRedisKey,
@@ -155,6 +157,49 @@ export async function getOrSetCache<T>(options: {
   }
 }
 
+async function unlinkRedisKeys(redis: Redis, keys: string[]): Promise<number> {
+  if (keys.length === 0) return 0;
+
+  const CHUNK_SIZE = 500;
+  let deleted = 0;
+
+  for (let i = 0; i < keys.length; i += CHUNK_SIZE) {
+    const chunk = keys.slice(i, i + CHUNK_SIZE);
+    if (chunk.length === 0) continue;
+    try {
+      deleted += await redis.unlink(...chunk);
+    } catch {
+      deleted += await redis.del(...chunk);
+    }
+  }
+
+  return deleted;
+}
+
+async function scanRedisKeysByPattern(redis: Redis, pattern: string): Promise<string[]> {
+  const found = new Set<string>();
+  let cursor = "0";
+  let iterations = 0;
+  const MAX_SCAN_ITERATIONS = 10_000;
+
+  do {
+    const [nextCursor, batch] = await redis.scan(
+      cursor,
+      "MATCH",
+      pattern,
+      "COUNT",
+      200
+    );
+    cursor = nextCursor;
+    for (const k of batch) {
+      found.add(k);
+    }
+    iterations++;
+  } while (cursor !== "0" && iterations < MAX_SCAN_ITERATIONS);
+
+  return Array.from(found);
+}
+
 /**
  * Invalidate exact cache keys in Redis (and offline fallback memory).
  */
@@ -170,13 +215,9 @@ export async function invalidateCacheKeys(...keys: string[]): Promise<void> {
   if (!redis) return;
 
   try {
-    await redis.unlink(...fullKeys);
+    await unlinkRedisKeys(redis, fullKeys);
   } catch (err: unknown) {
-    try {
-      await redis.del(...fullKeys);
-    } catch {
-      markRedisOffline(getErrorMessage(err, "Redis key invalidation failed"));
-    }
+    markRedisOffline(getErrorMessage(err, "Redis key invalidation failed"));
   }
 }
 
@@ -221,19 +262,80 @@ export async function invalidateCacheTags(...tags: string[]): Promise<void> {
       }
     }
 
-    const allKeys = Array.from(keysToDelete);
-    const CHUNK_SIZE = 500;
-    for (let i = 0; i < allKeys.length; i += CHUNK_SIZE) {
-      const chunk = allKeys.slice(i, i + CHUNK_SIZE);
-      if (chunk.length > 0) {
-        try {
-          await redis.unlink(...chunk);
-        } catch {
-          await redis.del(...chunk);
-        }
-      }
-    }
+    await unlinkRedisKeys(redis, Array.from(keysToDelete));
   } catch (err: unknown) {
     markRedisOffline(getErrorMessage(err, "Redis tag invalidation failed"));
+  }
+}
+
+export interface InvalidateAllCacheResult {
+  ok: true;
+  mode: "redis" | "memory-fallback";
+  clearedKeys: number;
+  includeRateLimits: boolean;
+}
+
+/**
+ * Count active application cache keys currently stored in Redis (or fallback memory).
+ */
+export async function countRedisCacheKeys(): Promise<{
+  mode: "redis" | "memory-fallback";
+  count: number;
+}> {
+  const redis = await getReadyRedisClient();
+  if (redis) {
+    try {
+      const keys = await scanRedisKeysByPattern(redis, `${prefixRedisKey("cache:")}*`);
+      return { mode: "redis", count: keys.length };
+    } catch (err: unknown) {
+      markRedisOffline(getErrorMessage(err, "Redis cache key scan failed"));
+    }
+  }
+
+  return { mode: "memory-fallback", count: fallbackCache.size };
+}
+
+/**
+ * Flush all cached application data from Redis (and offline fallback memory) using non-blocking SCAN + UNLINK.
+ * By default preserves rate-limit / brute-force bans (`rl:*`) unless `includeRateLimits: true` is passed.
+ */
+export async function invalidateAllRedisCache(options?: {
+  includeRateLimits?: boolean;
+}): Promise<InvalidateAllCacheResult> {
+  const includeRateLimits = Boolean(options?.includeRateLimits);
+  const fallbackCount = fallbackCache.size;
+  fallbackCache.clear();
+
+  const redis = await getReadyRedisClient();
+  if (!redis) {
+    return {
+      ok: true,
+      mode: "memory-fallback",
+      clearedKeys: fallbackCount,
+      includeRateLimits,
+    };
+  }
+
+  const pattern = includeRateLimits
+    ? `${getRedisKeyPrefix()}*`
+    : `${prefixRedisKey("cache:")}*`;
+
+  try {
+    const keys = await scanRedisKeysByPattern(redis, pattern);
+    const deleted = await unlinkRedisKeys(redis, keys);
+    return {
+      ok: true,
+      mode: "redis",
+      clearedKeys: deleted,
+      includeRateLimits,
+    };
+  } catch (err: unknown) {
+    markRedisOffline(getErrorMessage(err, "Redis full cache invalidation failed"));
+    return {
+      ok: true,
+      mode: "memory-fallback",
+      clearedKeys: fallbackCount,
+      includeRateLimits,
+    };
   }
 }

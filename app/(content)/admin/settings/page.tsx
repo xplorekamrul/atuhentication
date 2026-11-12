@@ -1,6 +1,10 @@
 import { AdminDummyPageShell } from "@/components/admin/rbac-dummy/AdminDummyPageShell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { isRateLimitEnabled } from "@/lib/rate-limit";
+import {
+  getPageRateLimitConfig,
+  isAuthRateLimitEnabled,
+  isPageRateLimitEnabled,
+} from "@/lib/rate-limit";
 import { getDefaultRedisCacheTtlSeconds } from "@/lib/redis/cache";
 import { getRedisStatus } from "@/lib/redis/client";
 import { Suspense } from "react";
@@ -12,15 +16,23 @@ export const metadata = {
 async function RedisSettingsContent() {
   const redisStatus = await getRedisStatus();
   const cacheTtlSeconds = getDefaultRedisCacheTtlSeconds();
-  const rateLimitEnabled = isRateLimitEnabled();
+  const authRateLimitEnabled = isAuthRateLimitEnabled();
+  const pageRateLimitEnabled = isPageRateLimitEnabled();
+  const pageConfig = getPageRateLimitConfig();
 
   const configItems = [
     { key: "Session Version Enforcement", value: "Active (Real-time JWT check)" },
     {
-      key: "Rate Limit Escalation",
-      value: rateLimitEnabled
+      key: "Auth Rate Limit Escalation",
+      value: authRateLimitEnabled
         ? "Redis Lua (1h -> 2h -> 4h -> 8h -> 16h -> 24h)"
-        : "Disabled (RATELIMIT_ENABLED=false)",
+        : "Disabled (AUTH_RATELIMIT_ENABLED=false)",
+    },
+    {
+      key: "Global Page Bot Rate Limit",
+      value: pageRateLimitEnabled
+        ? `${pageConfig.maxRequests} req / ${pageConfig.windowSeconds}s (${pageConfig.baseBlockSeconds}s -> 24h block)`
+        : "Disabled (PAGE_RATELIMIT_ENABLED=false)",
     },
     {
       key: "RBAC & Sidebar Cache Engine",
@@ -48,13 +60,19 @@ async function RedisSettingsContent() {
             ? "Distributed Redis cache active"
             : "Start Docker Redis to switch live",
         },
-        { label: "Admin Auth Mode", value: "Credentials", hint: "OAuth disabled on admin side" },
         {
-          label: "Rate Limiter",
-          value: rateLimitEnabled ? "Redis Lua" : "Disabled",
-          hint: rateLimitEnabled
-            ? "Atomic window + exponential lockouts"
-            : "Turned off via RATELIMIT_ENABLED",
+          label: "Auth Rate Limiter",
+          value: authRateLimitEnabled ? "Active" : "Disabled",
+          hint: authRateLimitEnabled
+            ? "Login, OTP & signup protection"
+            : "Turned off via AUTH_RATELIMIT_ENABLED",
+        },
+        {
+          label: "Page Bot Shield",
+          value: pageRateLimitEnabled ? `${pageConfig.maxRequests}/${pageConfig.windowSeconds}s` : "Disabled",
+          hint: pageRateLimitEnabled
+            ? `Escalating ${pageConfig.baseBlockSeconds}s->24h blocks`
+            : "Turned off via PAGE_RATELIMIT_ENABLED",
         },
         { label: "Session Checks", value: "Strict", hint: "Status + sessionVersion verified" },
       ]}
