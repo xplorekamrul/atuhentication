@@ -93,7 +93,11 @@ export async function POST(req: NextRequest) {
     const includeRateLimits = Boolean(body?.includeRateLimits);
 
     const result = await invalidateAllRedisCache({ includeRateLimits });
-    revalidatePath("/", "layout");
+    try {
+      revalidatePath("/", "layout");
+    } catch {
+      // Safe no-op if layout revalidation isn't applicable in current request context
+    }
 
     const sourceLabel = result.mode === "redis" ? "Redis" : "in-memory fallback";
     return NextResponse.json(

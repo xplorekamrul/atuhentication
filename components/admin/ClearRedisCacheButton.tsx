@@ -32,7 +32,7 @@ export default function ClearRedisCacheButton() {
         return;
       }
 
-      // Clear any client-side sidebar route cache for immediate UI sync
+      // Clear any client-side sidebar route cache and trigger immediate UI sync
       try {
         for (let i = sessionStorage.length - 1; i >= 0; i--) {
           const key = sessionStorage.key(i);
@@ -40,8 +40,9 @@ export default function ClearRedisCacheButton() {
             sessionStorage.removeItem(key);
           }
         }
+        window.dispatchEvent(new Event("rbac-permissions-updated"));
       } catch {
-        // Ignore storage access errors
+        // Ignore storage/event errors
       }
 
       toast.success(data.message || "Redis cache cleared successfully.");

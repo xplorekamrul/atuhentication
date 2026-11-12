@@ -1,6 +1,6 @@
 "use client";
 
-import { getFilteredSidebarRoutes } from "@/actions/sidebar/get-filtered-routes";
+import { getFilteredSidebarRoutes, type NavNodeData } from "@/actions/sidebar/get-filtered-routes";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import clsx from "clsx";
@@ -70,7 +70,7 @@ const hardcodedNav: LocalNavNode[] = [
 /**
  * Reconstruct navigation with icons from hardcoded data
  */
-function reconstructWithIcons(filteredData: any[]): LocalNavNode[] {
+function reconstructWithIcons(filteredData: NavNodeData[]): LocalNavNode[] {
   return filteredData
     .map((node) => {
       if ("children" in node) {
@@ -83,7 +83,7 @@ function reconstructWithIcons(filteredData: any[]): LocalNavNode[] {
         return {
           label: node.label,
           icon: hardcodedGroup.icon,
-          children: node.children.map((child: any) => {
+          children: node.children.map((child) => {
             const hardcodedChild = hardcodedGroup.children.find(
               (c) => c.href === child.href
             );
@@ -177,7 +177,7 @@ export default function Sidebar({
           // Ignore storage quota errors
         }
       } catch (error) {
-        console.error("[Sidebar] Failed to load filtered routes:", error);
+        console.warn("[Sidebar] Failed to load filtered routes:", error);
         if (!hasCachedItems) {
           setItems([]);
         }
@@ -199,7 +199,7 @@ export default function Sidebar({
     return () => {
       window.removeEventListener("rbac-permissions-updated", handlePermissionsUpdated);
     };
-  }, [user]);
+  }, [user?.id]);
 
   // Update open groups based on pathname
   useEffect(() => {
@@ -237,7 +237,10 @@ export default function Sidebar({
       if (user?.id) {
         sessionStorage.removeItem(`_cached_sidebar_routes_${user.id}`);
       }
-      const target = (user as any)?.userType === "ADMIN" ? "/admin/login" : "/login";
+      const target =
+        (user as { userType?: string } | undefined)?.userType === "ADMIN"
+          ? "/admin/login"
+          : "/login";
       await signOut({ redirect: false, callbackUrl: target });
       router.push(target);
     } catch {

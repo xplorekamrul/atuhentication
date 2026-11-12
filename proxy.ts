@@ -47,10 +47,19 @@ function buildBlockedPageResponse(
     "Cache-Control": "no-store",
   });
 
+  // Server Actions expect either `text/x-component` or exact `text/plain` on >= 400 errors;
+  // returning JSON/HTML causes Next.js to throw "An unexpected response was received from the server."
+  if (req.headers.has("next-action")) {
+    headers.set("Content-Type", "text/plain");
+    return new NextResponse(
+      `Too many requests. Access temporarily blocked for ${pageLimit.formattedDuration}.`,
+      { status: 429, headers }
+    );
+  }
+
   const accept = req.headers.get("accept") || "";
   const isJsonPreferred =
-    (accept.includes("application/json") && !accept.includes("text/html")) ||
-    req.headers.has("next-action");
+    accept.includes("application/json") && !accept.includes("text/html");
 
   if (isJsonPreferred) {
     headers.set("Content-Type", "application/json; charset=utf-8");
@@ -149,6 +158,15 @@ export async function proxy(req: NextRequest) {
     const userId = sessionUser?.id ?? null;
 
     const requireLogin = (redirectTo = "/login") => {
+      if (req.headers.has("next-action")) {
+        return withPageRateLimitHeaders(
+          new NextResponse("Session expired. Please reload and sign in again.", {
+            status: 401,
+            headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" },
+          }),
+          pageLimit
+        );
+      }
       url.pathname = redirectTo;
       url.searchParams.set("callbackUrl", pathname);
       return withPageRateLimitHeaders(NextResponse.redirect(url), pageLimit);
