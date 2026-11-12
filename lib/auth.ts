@@ -63,18 +63,18 @@ export const authOptions: NextAuthOptions = {
 
         // 1. IP Burst Rate Limiter with Exponential Escalation (1h -> 2h -> 4h -> 8h -> 24h)
         const ipBurstLockKey = `exp:burst:ip:${ip}`;
-        const burstLockCheck = checkExponentialLockout(ipBurstLockKey);
+        const burstLockCheck = await checkExponentialLockout(ipBurstLockKey);
         if (burstLockCheck.locked) {
-          const penalized = recordSpamWhileLocked(ipBurstLockKey, { threshold: 1, baseLockSeconds: 3600 });
+          const penalized = await recordSpamWhileLocked(ipBurstLockKey, { threshold: 1, baseLockSeconds: 3600 });
           throw new Error(
             `High volume of login requests detected. Network blocked for ${penalized.formattedDuration}. Please try later.`
           );
         }
 
         // Check sliding window: max 30 requests per 3 minutes
-        const burstWindow = incrementRateLimit(`burst:window:ip:${ip}`, 30, 180);
+        const burstWindow = await incrementRateLimit(`burst:window:ip:${ip}`, 30, 180);
         if (!burstWindow.success) {
-          const lockResult = recordExponentialFailure(ipBurstLockKey, { threshold: 1, baseLockSeconds: 3600 });
+          const lockResult = await recordExponentialFailure(ipBurstLockKey, { threshold: 1, baseLockSeconds: 3600 });
           throw new Error(
             `High volume of login requests detected. Network blocked for ${lockResult.formattedDuration}. Please try later.`
           );
@@ -84,32 +84,32 @@ export const authOptions: NextAuthOptions = {
         const accountLockKey = `exp:account:${identifier.toLowerCase()}`;
         const ipFailLockKey = `exp:fail:ip:${ip}`;
 
-        const accountLockCheck = checkExponentialLockout(accountLockKey);
+        const accountLockCheck = await checkExponentialLockout(accountLockKey);
         if (accountLockCheck.locked) {
-          const penalized = recordSpamWhileLocked(accountLockKey, { threshold: 5, baseLockSeconds: 3600 });
+          const penalized = await recordSpamWhileLocked(accountLockKey, { threshold: 5, baseLockSeconds: 3600 });
           throw new Error(
             `Account temporarily locked due to too many failed attempts. Try again in ${penalized.formattedDuration}.`
           );
         }
 
-        const ipLockCheck = checkExponentialLockout(ipFailLockKey);
+        const ipLockCheck = await checkExponentialLockout(ipFailLockKey);
         if (ipLockCheck.locked) {
-          const penalized = recordSpamWhileLocked(ipFailLockKey, { threshold: 15, baseLockSeconds: 3600 });
+          const penalized = await recordSpamWhileLocked(ipFailLockKey, { threshold: 15, baseLockSeconds: 3600 });
           throw new Error(
             `Too many failed login attempts from this network. Try again in ${penalized.formattedDuration}.`
           );
         }
 
-        const recordFailedAttempt = () => {
+        const recordFailedAttempt = async () => {
           if (identifier) {
-            const accResult = recordExponentialFailure(accountLockKey, { threshold: 5, baseLockSeconds: 3600 });
+            const accResult = await recordExponentialFailure(accountLockKey, { threshold: 5, baseLockSeconds: 3600 });
             if (accResult.locked) {
               throw new Error(
                 `Account temporarily locked due to too many failed attempts. Try again in ${accResult.formattedDuration}.`
               );
             }
           }
-          const ipResult = recordExponentialFailure(ipFailLockKey, { threshold: 15, baseLockSeconds: 3600 });
+          const ipResult = await recordExponentialFailure(ipFailLockKey, { threshold: 15, baseLockSeconds: 3600 });
           if (ipResult.locked) {
             throw new Error(
               `Too many failed login attempts from this network. Try again in ${ipResult.formattedDuration}.`
@@ -168,13 +168,13 @@ export const authOptions: NextAuthOptions = {
           }
 
           if (!admin) {
-            recordFailedAttempt();
+            await recordFailedAttempt();
             return null;
           }
 
           const ok = await bcrypt.compare(password, admin.password);
           if (!ok) {
-            recordFailedAttempt();
+            await recordFailedAttempt();
             return null;
           }
 
@@ -188,7 +188,7 @@ export const authOptions: NextAuthOptions = {
           }
 
           // Successful login: reset account failed attempts
-          resetExponentialLockout(accountLockKey);
+          await resetExponentialLockout(accountLockKey);
 
           // Log admin login history
           try {
@@ -232,13 +232,13 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (!user) {
-            recordFailedAttempt();
+            await recordFailedAttempt();
             return null;
           }
 
           // User must have a password for credentials login (OAuth-only users won't have one)
           if (!user.password) {
-            recordFailedAttempt();
+            await recordFailedAttempt();
             return null;
           }
 
@@ -253,12 +253,12 @@ export const authOptions: NextAuthOptions = {
 
           const ok = await bcrypt.compare(password, user.password);
           if (!ok) {
-            recordFailedAttempt();
+            await recordFailedAttempt();
             return null;
           }
 
           // Successful login: reset account failed attempts
-          resetExponentialLockout(accountLockKey);
+          await resetExponentialLockout(accountLockKey);
 
           // Log user login history
           try {

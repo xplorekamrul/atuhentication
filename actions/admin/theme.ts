@@ -1,35 +1,47 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { getErrorMessage } from "@/lib/redis/client";
+import { DEFAULT_CACHE_TTL_SECONDS, getOrSetCache, invalidateCacheTags } from "@/lib/redis/cache";
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import type { ThemeColors } from "@/lib/theme-utils";
 
 export async function getThemes() {
   try {
-    let themes = await prisma.theme.findMany({
-      orderBy: { createdAt: "desc" },
-    });
+    const themes = await getOrSetCache({
+      key: "theme:list",
+      tags: ["theme"],
+      ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+      fetcher: async () => {
+        let rows = await prisma.theme.findMany({
+          orderBy: { createdAt: "desc" },
+        });
 
-    // If database has no themes yet, seed beautiful pre-defined initial themes
-    if (themes.length === 0) {
-      await seedInitialThemes();
-      themes = await prisma.theme.findMany({
-        orderBy: { createdAt: "desc" },
-      });
-    }
+        // If database has no themes yet, seed pre-defined initial themes
+        if (rows.length === 0) {
+          await seedInitialThemes();
+          rows = await prisma.theme.findMany({
+            orderBy: { createdAt: "desc" },
+          });
+        }
+
+        return rows.map((t) => ({
+          id: t.id.toString(),
+          name: t.name,
+          colors: (typeof t.colors === "string" ? JSON.parse(t.colors) : t.colors) as ThemeColors,
+          isDefault: t.isDefault,
+        }));
+      },
+    });
 
     return {
       success: true as const,
-      themes: themes.map((t) => ({
-        id: t.id.toString(),
-        name: t.name,
-        colors: (typeof t.colors === "string" ? JSON.parse(t.colors) : t.colors) as ThemeColors,
-        isDefault: t.isDefault,
-      })),
+      themes,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to fetch themes:", error);
-    return { success: false as const, error: error.message || "Failed to load themes" };
+    return { success: false as const, error: getErrorMessage(error, "Failed to load themes") };
   }
 }
 
@@ -59,11 +71,12 @@ export async function createTheme(name: string, colors: ThemeColors, isDefault: 
     const theme = await prisma.theme.create({
       data: {
         name: trimmedName,
-        colors: colors as any,
+        colors: colors as unknown as Prisma.InputJsonValue,
         isDefault,
       },
     });
 
+    await invalidateCacheTags("theme");
     revalidatePath("/admin/themes");
     revalidatePath("/", "layout");
 
@@ -76,9 +89,9 @@ export async function createTheme(name: string, colors: ThemeColors, isDefault: 
         isDefault: theme.isDefault,
       },
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to create theme:", error);
-    return { success: false as const, error: error.message || "Failed to create theme." };
+    return { success: false as const, error: getErrorMessage(error, "Failed to create theme.") };
   }
 }
 
@@ -119,11 +132,12 @@ export async function updateTheme(
       where: { id },
       data: {
         name: trimmedName,
-        colors: colors as any,
+        colors: colors as unknown as Prisma.InputJsonValue,
         isDefault,
       },
     });
 
+    await invalidateCacheTags("theme");
     revalidatePath("/admin/themes");
     revalidatePath("/", "layout");
 
@@ -136,9 +150,9 @@ export async function updateTheme(
         isDefault: theme.isDefault,
       },
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to update theme:", error);
-    return { success: false as const, error: error.message || "Failed to update theme." };
+    return { success: false as const, error: getErrorMessage(error, "Failed to update theme.") };
   }
 }
 
@@ -164,13 +178,14 @@ export async function deleteTheme(rawId: string | bigint) {
       where: { id },
     });
 
+    await invalidateCacheTags("theme");
     revalidatePath("/admin/themes");
     revalidatePath("/", "layout");
 
     return { success: true as const };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to delete theme:", error);
-    return { success: false as const, error: error.message || "Failed to delete theme." };
+    return { success: false as const, error: getErrorMessage(error, "Failed to delete theme.") };
   }
 }
 
@@ -189,13 +204,14 @@ export async function setDefaultTheme(rawId: string | bigint) {
       }),
     ]);
 
+    await invalidateCacheTags("theme");
     revalidatePath("/admin/themes");
     revalidatePath("/", "layout");
 
     return { success: true as const };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to set default theme:", error);
-    return { success: false as const, error: error.message || "Failed to set default theme." };
+    return { success: false as const, error: getErrorMessage(error, "Failed to set default theme.") };
   }
 }
 

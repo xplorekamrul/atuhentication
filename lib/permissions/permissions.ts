@@ -1,28 +1,11 @@
 import { prisma } from "@/lib/prisma";
-import { cacheLife, cacheTag } from "next/cache";
+import {
+  DEFAULT_CACHE_TTL_SECONDS,
+  getOrSetCache,
+  invalidateCacheTags,
+} from "@/lib/redis/cache";
 import developerPages from "./developer-pages.json";
 import { matchesPattern, normalizePath } from "./route-pattern-matcher";
-
-// Global in-memory Layer 1 cache shared between proxy and server runtime
-const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
-
-interface CacheEntry {
-  paths: string[];
-  timestamp: number;
-}
-
-interface AdminLevelCacheEntry {
-  level: string;
-  timestamp: number;
-}
-
-const memoryPermissionsCache: Map<string, CacheEntry> =
-  (globalThis as any).__memoryPermissionsCache || new Map();
-(globalThis as any).__memoryPermissionsCache = memoryPermissionsCache;
-
-const memoryAdminLevelCache: Map<string, AdminLevelCacheEntry> =
-  (globalThis as any).__memoryAdminLevelCache || new Map();
-(globalThis as any).__memoryAdminLevelCache = memoryAdminLevelCache;
 
 /**
  * Check if a path is developer-only
@@ -34,29 +17,26 @@ export function isDeveloperOnlyPage(pathname: string): boolean {
 }
 
 /**
- * Resolve admin level with Layer 1 in-memory caching
+ * Resolve admin level using Redis cache (with automatic in-memory fallback)
  */
 async function resolveAdminLevel(adminId: string): Promise<string | null> {
-  const now = Date.now();
-  const cached = memoryAdminLevelCache.get(adminId);
-  if (cached && now - cached.timestamp < CACHE_TTL_MS) {
-    return cached.level;
-  }
-
-  const admin = await prisma.admin.findUnique({
-    where: { id: adminId },
-    select: { level: true },
+  return getOrSetCache<string | null>({
+    key: `rbac:admin:level:${adminId}`,
+    tags: ["admin-permissions", `admin-permissions-${adminId}`],
+    ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+    fetcher: async () => {
+      const admin = await prisma.admin.findUnique({
+        where: { id: adminId },
+        select: { level: true },
+      });
+      return admin?.level ?? null;
+    },
   });
-
-  if (!admin) return null;
-
-  memoryAdminLevelCache.set(adminId, { level: admin.level, timestamp: now });
-  return admin.level;
 }
 
 /**
- * Layer 1: Fetch accessible paths using globalThis in-memory cache (0 DB hits on cache hit).
- * Used directly by proxy.ts (which runs outside React "use cache") and wrapped by Layer 2.
+ * Fetch accessible route paths for an admin via Redis cache (0 DB hits on cache hit).
+ * Shared seamlessly across proxy.ts, Server Components, and Server Actions.
  */
 export async function fetchAdminAccessiblePaths(
   adminId: string,
@@ -66,66 +46,59 @@ export async function fetchAdminAccessiblePaths(
     return ["*"];
   }
 
-  const cacheKey = `${adminId}_${level}`;
-  const now = Date.now();
-  const cached = memoryPermissionsCache.get(cacheKey);
+  return getOrSetCache<string[]>({
+    key: `rbac:admin:paths:${adminId}:${level}`,
+    tags: ["admin-permissions", `admin-permissions-${adminId}`],
+    ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+    fetcher: async () => {
+      if (level === "SUPER_ADMIN") {
+        const routes = await prisma.route.findMany({
+          where: { visibleToSuperAdmin: true },
+          select: { path: true },
+        });
+        return routes.map((r) => r.path);
+      }
 
-  if (cached && now - cached.timestamp < CACHE_TTL_MS) {
-    return cached.paths;
-  }
-
-  let paths: string[] = [];
-
-  if (level === "SUPER_ADMIN") {
-    const routes = await prisma.route.findMany({
-      where: { visibleToSuperAdmin: true },
-      select: { path: true },
-    });
-    paths = routes.map((r) => r.path);
-  } else if (level === "ADMIN") {
-    // Single relational query: Admin -> AdminRole -> Role -> RoleRouteGroup -> RouteGroup -> Route
-    const routes = await prisma.route.findMany({
-      where: {
-        visibleToAdmin: true,
-        group: {
-          roleRouteGroups: {
-            some: {
-              role: {
-                adminRoles: {
-                  some: { adminId },
+      if (level === "ADMIN") {
+        // Single relational query: Admin -> AdminRole -> Role -> RoleRouteGroup -> RouteGroup -> Route
+        const routes = await prisma.route.findMany({
+          where: {
+            visibleToAdmin: true,
+            group: {
+              roleRouteGroups: {
+                some: {
+                  role: {
+                    adminRoles: {
+                      some: { adminId },
+                    },
+                  },
                 },
               },
             },
           },
-        },
-      },
-      select: { path: true },
-    });
-    paths = routes.map((r) => r.path);
-  }
+          select: { path: true },
+        });
+        return routes.map((r) => r.path);
+      }
 
-  memoryPermissionsCache.set(cacheKey, { paths, timestamp: now });
-  return paths;
+      return [];
+    },
+  });
 }
 
 /**
- * Layer 2: Next.js 16 "use cache" function for Server Components and Server Actions
+ * Redis-cached accessible route paths for Server Components and Server Actions
  */
 export async function getCachedAdminAccessiblePaths(
   adminId: string,
   level: string
 ): Promise<string[]> {
-  "use cache";
-  cacheLife("hours");
-  cacheTag("admin-permissions");
-  cacheTag(`admin-permissions-${adminId}`);
-
   return fetchAdminAccessiblePaths(adminId, level);
 }
 
 /**
- * Get all accessible routes for an admin based on their level and roles
- * Returns null for DEVELOPER (unrestricted full access)
+ * Get all accessible routes for an admin based on their level and roles.
+ * Returns null for DEVELOPER (unrestricted full access).
  */
 export async function getAdminAccessibleRoutes(adminId: string, level?: string) {
   const resolvedLevel = level ?? (await resolveAdminLevel(adminId));
@@ -139,7 +112,7 @@ export async function getAdminAccessibleRoutes(adminId: string, level?: string) 
 }
 
 /**
- * Check if an admin can access a specific path (uses Layer 1 in-memory cache for proxy speed)
+ * Check if an admin can access a specific path (uses Redis cache for proxy speed)
  */
 export async function canAdminAccessPath(
   adminId: string,
@@ -181,49 +154,58 @@ export async function canAdminAccessPath(
 }
 
 /**
- * Cached check for whether an admin can edit a specific route
+ * Redis-cached check for whether an admin can edit a specific route
  */
 async function getCachedAdminCanEditRoute(
   adminId: string,
   level: string,
   routePath: string
 ): Promise<boolean> {
-  "use cache";
-  cacheLife("hours");
-  cacheTag("admin-permissions", `admin-permissions-${adminId}`, "route-edit-permissions", `route-${routePath}`);
-
+  const normalizedRoute = normalizePath(routePath);
   if (level === "DEVELOPER") return true;
 
-  if (level === "SUPER_ADMIN") {
-    const route = await prisma.route.findUnique({
-      where: { path: routePath },
-      select: { id: true },
-    });
-    return !!route;
-  }
+  return getOrSetCache<boolean>({
+    key: `rbac:admin:edit-route:${adminId}:${level}:${normalizedRoute}`,
+    tags: [
+      "admin-permissions",
+      `admin-permissions-${adminId}`,
+      "route-edit-permissions",
+      `route-${normalizedRoute}`,
+    ],
+    ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+    fetcher: async () => {
+      if (level === "SUPER_ADMIN") {
+        const route = await prisma.route.findUnique({
+          where: { path: normalizedRoute },
+          select: { id: true },
+        });
+        return !!route;
+      }
 
-  if (level === "ADMIN") {
-    const route = await prisma.route.findFirst({
-      where: {
-        path: routePath,
-        group: {
-          roleRouteGroups: {
-            some: {
-              role: {
-                adminRoles: {
-                  some: { adminId },
+      if (level === "ADMIN") {
+        const route = await prisma.route.findFirst({
+          where: {
+            path: normalizedRoute,
+            group: {
+              roleRouteGroups: {
+                some: {
+                  role: {
+                    adminRoles: {
+                      some: { adminId },
+                    },
+                  },
                 },
               },
             },
           },
-        },
-      },
-      select: { id: true },
-    });
-    return !!route;
-  }
+          select: { id: true },
+        });
+        return !!route;
+      }
 
-  return false;
+      return false;
+    },
+  });
 }
 
 /**
@@ -242,39 +224,23 @@ export async function canAdminEditRoute(
 }
 
 /**
- * Instant Dual-Layer Cache Invalidator:
- * Clears BOTH Layer 1 (globalThis in-memory proxy cache) and Layer 2 (Next.js 16 cache tags).
+ * Instant Distributed Redis Cache Invalidator:
+ * Clears Redis permission/sidebar/RBAC cache keys across all instances immediately.
  */
 export async function invalidateAdminPermissionsCache(adminId?: string): Promise<void> {
-  // 1. Clear Layer 1 in-memory cache (used by proxy.ts on next request)
   if (adminId) {
-    for (const key of memoryPermissionsCache.keys()) {
-      if (key.startsWith(`${adminId}_`)) {
-        memoryPermissionsCache.delete(key);
-      }
-    }
-    memoryAdminLevelCache.delete(adminId);
-  } else {
-    memoryPermissionsCache.clear();
-    memoryAdminLevelCache.clear();
+    await invalidateCacheTags(`admin-permissions-${adminId}`, "rbac-roles");
+    return;
   }
 
-  // 2. Clear Layer 2 Next.js 16 "use cache" tags
-  try {
-    const { revalidateTag } = await import("next/cache");
-    if (adminId) {
-      revalidateTag(`admin-permissions-${adminId}`, "max");
-    } else {
-      revalidateTag("admin-permissions", "max");
-    }
-    revalidateTag("sidebar-routes", "max");
-    revalidateTag("route-edit-permissions", "max");
-    revalidateTag("user-edit-permissions", "max");
-    revalidateTag("rbac-data", "max");
-    revalidateTag("rbac-roles", "max");
-    revalidateTag("rbac-route-groups", "max");
-    revalidateTag("rbac-routes", "max");
-  } catch {
-    // No-op if invoked outside Next.js server request context (e.g. standalone test script)
-  }
+  await invalidateCacheTags(
+    "admin-permissions",
+    "sidebar-routes",
+    "route-edit-permissions",
+    "user-edit-permissions",
+    "rbac-data",
+    "rbac-roles",
+    "rbac-route-groups",
+    "rbac-routes"
+  );
 }

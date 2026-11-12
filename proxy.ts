@@ -112,7 +112,7 @@ export async function proxy(req: NextRequest) {
         return NextResponse.next();
       }
 
-      // SUPER_ADMIN and ADMIN: check permissions via Layer 1 in-memory cache (no repeated DB hits)
+      // SUPER_ADMIN and ADMIN: check permissions via Redis cache (0 repeated DB hits)
       if ((level === LEVEL_SUPER || level === LEVEL_ADMIN) && userId) {
         const hasAccess = await canAdminAccessPath(userId, pathname, level);
         if (!hasAccess) {

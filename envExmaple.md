@@ -36,6 +36,11 @@ RESET_TOKEN_TTL_MIN=15
 # App URL for server-side fetches
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 
+# ---------- Redis Cache & Rate Limiting ----------
+# Run `docker compose up -d` to start local Redis on port 6379
+REDIS_URL="redis://localhost:6379"
+REDIS_PREFIX="authapp:"
+
 # ---------- OAuth Credentials ----------
 # Get from https://console.cloud.google.com/apis/credentials
 GOOGLE_CLIENT_ID="YOUR_GOOGLE_CLIENT_ID"

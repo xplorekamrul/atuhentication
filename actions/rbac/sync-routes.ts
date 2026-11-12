@@ -197,7 +197,7 @@ export async function syncRoutesToDatabase(): Promise<SyncResult> {
    }
 }
 
-// Get all routes and route groups (served from Next.js "use cache")
+// Get all routes and route groups (served from Redis cache)
 export async function getAllRoutesAndGroups() {
    const session = await auth();
 

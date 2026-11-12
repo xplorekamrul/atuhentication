@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth';
 import { getCachedAdminAccessiblePaths } from '@/lib/permissions/permissions';
 import { prisma } from '@/lib/prisma';
-import { cacheLife, cacheTag } from 'next/cache';
+import { DEFAULT_CACHE_TTL_SECONDS, getOrSetCache } from '@/lib/redis/cache';
 
 export type SidebarRoute = {
    path: string;
@@ -9,43 +9,46 @@ export type SidebarRoute = {
 };
 
 /**
- * Cached route metadata from database (no auth calls inside "use cache")
+ * Redis-cached route metadata from database
  */
 async function getCachedAllRoutesMeta() {
-   'use cache';
-   cacheLife('hours');
-   cacheTag('sidebar-routes', 'rbac-data', 'rbac-routes');
-
-   const routes = await prisma.route.findMany({
-      select: {
-         path: true,
-         visibleToAdmin: true,
-         visibleToSuperAdmin: true,
-         groupId: true,
-         group: {
+   return getOrSetCache({
+      key: 'rbac:sidebar:routes-meta',
+      tags: ['sidebar-routes', 'rbac-data', 'rbac-routes'],
+      ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+      fetcher: async () => {
+         const routes = await prisma.route.findMany({
             select: {
-               name: true,
+               path: true,
+               visibleToAdmin: true,
+               visibleToSuperAdmin: true,
+               groupId: true,
+               group: {
+                  select: {
+                     name: true,
+                  },
+               },
             },
-         },
+         });
+
+         return routes.map((r) => ({
+            path: r.path,
+            visibleToAdmin: r.visibleToAdmin,
+            visibleToSuperAdmin: r.visibleToSuperAdmin,
+            groupId: r.groupId.toString(),
+            groupName: r.group.name,
+         }));
       },
    });
-
-   return routes.map((r) => ({
-      path: r.path,
-      visibleToAdmin: r.visibleToAdmin,
-      visibleToSuperAdmin: r.visibleToSuperAdmin,
-      groupId: r.groupId.toString(),
-      groupName: r.group.name,
-   }));
 }
 
 /**
- * Get all routes with their visibility permissions (Layer 2 cached)
+ * Get all routes with their visibility permissions (Redis cached)
  */
 export async function getRoutesWithPermissions() {
    const session = await auth();
    const adminId = session?.user?.id ?? null;
-   const adminLevel = (session?.user as any)?.level as string | undefined;
+   const adminLevel = (session?.user as { level?: string } | undefined)?.level;
 
    const [allRoutes, accessiblePaths] = await Promise.all([
       getCachedAllRoutesMeta(),

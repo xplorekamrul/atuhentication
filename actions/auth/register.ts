@@ -20,7 +20,7 @@ export const register = actionClient
     // 1. IP Rate Limiting: max 5 registrations per hour per IP to prevent spam bot accounts
     const headerList = await headers();
     const ip = getClientIp(headerList);
-    const regLimit = incrementRateLimit(`reg:ip:${ip}`, 5, 60 * 60);
+    const regLimit = await incrementRateLimit(`reg:ip:${ip}`, 5, 60 * 60);
     if (!regLimit.success) {
       return {
         ok: false as const,

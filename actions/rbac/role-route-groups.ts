@@ -67,7 +67,7 @@ export const assignRouteGroupsToRole = developerActionClient
          },
       });
 
-      // Clear Layer 1 (proxy memory cache) & Layer 2 (Next.js cache tags) for all admins assigned to this role
+      // Clear Redis RBAC & permission caches for all admins assigned to this role
       await invalidateAdminPermissionsCache();
 
       return { ok: true as const, data: serializeBigInt(assignments) };

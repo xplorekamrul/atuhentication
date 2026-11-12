@@ -1,18 +1,27 @@
 import { AdminDummyPageShell } from "@/components/admin/rbac-dummy/AdminDummyPageShell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getRedisStatus } from "@/lib/redis/client";
+import { Suspense } from "react";
 
 export const metadata = {
   title: "Settings | Admin",
 };
 
-const configItems = [
-  { key: "Session Version Enforcement", value: "Active (Real-time JWT check)" },
-  { key: "Rate Limit Escalation", value: "1h -> 2h -> 4h -> 8h -> 16h -> 24h" },
-  { key: "RBAC Proxy Cache Layer", value: "Layer 1 In-Memory (10m TTL)" },
-  { key: "RBAC Data Cache Layer", value: "Layer 2 Next.js 16 Use Cache" },
-];
+async function RedisSettingsContent() {
+  const redisStatus = await getRedisStatus();
 
-export default function AdminSettingsPage() {
+  const configItems = [
+    { key: "Session Version Enforcement", value: "Active (Real-time JWT check)" },
+    { key: "Rate Limit Escalation", value: "Redis Lua (1h -> 2h -> 4h -> 8h -> 16h -> 24h)" },
+    { key: "RBAC & Sidebar Cache Engine", value: "Redis (1h TTL + Tag Sets, No Use Cache)" },
+    {
+      key: "Redis Connection Mode",
+      value: redisStatus.connected
+        ? `Connected (${redisStatus.status})`
+        : `Memory Fallback (${redisStatus.status})`,
+    },
+  ];
+
   return (
     <AdminDummyPageShell
       routePath="/admin/settings"
@@ -20,10 +29,16 @@ export default function AdminSettingsPage() {
       description="Test Super Admin restrictions (e.g., disable visibleToSuperAdmin to block SUPER_ADMIN access while keeping DEVELOPER unrestricted)."
       actionLabel="Update Configuration"
       metrics={[
-        { label: "Active Guards", value: "2 Layers", hint: "Memory + Next.js Cache Tags" },
+        {
+          label: "Cache Store",
+          value: redisStatus.connected ? "Redis Live" : "Fallback Mode",
+          hint: redisStatus.connected
+            ? "Distributed Redis cache active"
+            : "Start Docker Redis to switch live",
+        },
         { label: "Admin Auth Mode", value: "Credentials", hint: "OAuth disabled on admin side" },
+        { label: "Rate Limiter", value: "Redis Lua", hint: "Atomic window + exponential lockouts" },
         { label: "Session Checks", value: "Strict", hint: "Status + sessionVersion verified" },
-        { label: "Environment", value: "Configured", hint: "RBAC test target ready" },
       ]}
     >
       <Card>
@@ -31,7 +46,7 @@ export default function AdminSettingsPage() {
           <CardTitle className="text-lg">System Policy Overview</CardTitle>
           <CardDescription>
             Great for testing <span className="font-mono">visibleToSuperAdmin = false</span> in{" "}
-            <span className="font-mono">/admin/rbac</span>.
+            <span className="font-mono">/admin/rbac</span> and verifying live Redis connection state.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
@@ -50,3 +65,17 @@ export default function AdminSettingsPage() {
   );
 }
 
+export default function AdminSettingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-6 space-y-4">
+          <div className="h-24 rounded-lg bg-muted/60 animate-pulse" />
+          <div className="h-48 rounded-lg bg-muted/60 animate-pulse" />
+        </div>
+      }
+    >
+      <RedisSettingsContent />
+    </Suspense>
+  );
+}

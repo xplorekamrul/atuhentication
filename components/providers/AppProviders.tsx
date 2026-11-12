@@ -28,7 +28,7 @@ export default function AppProviders({ children }: { children: React.ReactNode }
       >
         <GoogleOneTap />
         {children}
-        <Toaster ricaccents position="top-right" />
+        <Toaster richColors position="top-right" />
       </ThemeProvider>
     </SessionProvider>
   );

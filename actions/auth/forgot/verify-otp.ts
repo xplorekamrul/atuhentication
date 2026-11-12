@@ -18,7 +18,7 @@ export const verifyResetOtp = actionClient
     // Rate limit verification attempts by IP
     const headerList = await headers();
     const ip = getClientIp(headerList);
-    const ipLimit = incrementRateLimit(`otp:verify:ip:${ip}`, 10, 5 * 60);
+    const ipLimit = await incrementRateLimit(`otp:verify:ip:${ip}`, 10, 5 * 60);
     if (!ipLimit.success) {
       return {
         ok: false as const,

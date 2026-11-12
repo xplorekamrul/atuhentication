@@ -23,7 +23,7 @@ export type FilteredRoutesResult = {
 };
 
 /**
- * Get all accessible routes from Layer 2 Next.js cache based on user level and roles.
+ * Get all accessible routes from Redis cache based on user level and roles.
  */
 export async function getAccessibleRoutePaths(adminId: string, level: string): Promise<string[]> {
    if (level === 'DEVELOPER') {

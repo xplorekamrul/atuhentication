@@ -3,7 +3,7 @@
 import { auth } from "@/lib/auth";
 import { getAdminAccessibleRoutes } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/prisma";
-import { cacheLife, cacheTag } from "next/cache";
+import { DEFAULT_CACHE_TTL_SECONDS, getOrSetCache } from "@/lib/redis/cache";
 
 export type RouteWithGroup = {
    id: string;
@@ -28,7 +28,7 @@ export async function getAccessibleRoutes() {
          return null;
       }
 
-      const level = (session.user as any)?.level as string | undefined;
+      const level = (session.user as { level?: string }).level;
       if (level === "SUPER_ADMIN" || level === "DEVELOPER") {
          return null; // null means full access
       }
@@ -44,35 +44,38 @@ export async function getAccessibleRoutes() {
 }
 
 async function getCachedDatabaseRoutes(): Promise<RouteWithGroup[]> {
-   "use cache";
-   cacheLife("hours");
-   cacheTag("rbac-data", "rbac-routes", "sidebar-routes");
-
-   const routes = await prisma.route.findMany({
-      select: {
-         id: true,
-         path: true,
-         name: true,
-         groupId: true,
-         group: {
+   return getOrSetCache({
+      key: "rbac:sidebar:db-routes",
+      tags: ["rbac-data", "rbac-routes", "sidebar-routes"],
+      ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+      fetcher: async () => {
+         const routes = await prisma.route.findMany({
             select: {
                id: true,
+               path: true,
                name: true,
+               groupId: true,
+               group: {
+                  select: {
+                     id: true,
+                     name: true,
+                  },
+               },
             },
-         },
-      },
-      orderBy: [{ group: { name: "asc" } }, { path: "asc" }],
-   });
+            orderBy: [{ group: { name: "asc" } }, { path: "asc" }],
+         });
 
-   return routes.map((route) => ({
-      ...route,
-      id: String(route.id),
-      groupId: String(route.groupId),
-      group: {
-         ...route.group,
-         id: String(route.group.id),
+         return routes.map((route) => ({
+            ...route,
+            id: String(route.id),
+            groupId: String(route.groupId),
+            group: {
+               ...route.group,
+               id: String(route.group.id),
+            },
+         }));
       },
-   }));
+   });
 }
 
 /**
@@ -82,7 +85,7 @@ async function getCachedDatabaseRoutes(): Promise<RouteWithGroup[]> {
 export async function getAllRoutes(): Promise<RouteWithGroup[]> {
    try {
       const session = await auth();
-      const level = (session?.user as any)?.level as string | undefined;
+      const level = (session?.user as { level?: string } | undefined)?.level;
 
       if (level === "DEVELOPER") {
          return getHardcodedRoutes();

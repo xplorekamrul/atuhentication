@@ -17,7 +17,7 @@ export const sendResetOtp = actionClient
     const ip = getClientIp(headerList);
 
     // 1. Rate limit by IP: max 5 requests per 10 minutes to prevent spam
-    const ipLimit = incrementRateLimit(`otp:send:ip:${ip}`, 5, 10 * 60);
+    const ipLimit = await incrementRateLimit(`otp:send:ip:${ip}`, 5, 10 * 60);
     if (!ipLimit.success) {
       return {
         ok: false as const,
@@ -26,7 +26,7 @@ export const sendResetOtp = actionClient
     }
 
     // 2. Rate limit by Email: max 3 requests per 10 minutes to prevent email flooding
-    const emailLimit = incrementRateLimit(`otp:send:email:${email}`, 3, 10 * 60);
+    const emailLimit = await incrementRateLimit(`otp:send:email:${email}`, 3, 10 * 60);
     if (!emailLimit.success) {
       return {
         ok: false as const,

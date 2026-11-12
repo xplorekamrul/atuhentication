@@ -3,7 +3,9 @@
 import { serializeBigInt, toBigIntOrNull } from "@/lib/bigint-utils";
 import { invalidateAdminPermissionsCache } from "@/lib/permissions/permissions";
 import { getCachedRoutesList } from "@/lib/permissions/rbac-cache";
+import { normalizePath } from "@/lib/permissions/route-pattern-matcher";
 import { prisma } from "@/lib/prisma";
+import { invalidateCacheTags } from "@/lib/redis/cache";
 import { developerActionClient } from "@/lib/safe-action/clients";
 import {
    routeCreateSchema,
@@ -11,7 +13,6 @@ import {
    routeListSchema,
    routeUpdateSchema,
 } from "@/lib/validations/rbac";
-import { revalidateTag } from "next/cache";
 
 export const listRoutes = developerActionClient
    .inputSchema(routeListSchema)
@@ -72,9 +73,11 @@ export const createRoute = developerActionClient
          },
       });
 
-      // Revalidate Layer 1 (memory) and Layer 2 (Next.js cache tags) immediately
-      await invalidateAdminPermissionsCache();
-      revalidateTag(`route-${path}`, "max");
+      // Revalidate Redis RBAC & route permission caches immediately
+      await Promise.all([
+         invalidateAdminPermissionsCache(),
+         invalidateCacheTags(`route-${normalizePath(path)}`),
+      ]);
 
       return { ok: true as const, data: serializeBigInt(route) };
    });
@@ -143,10 +146,14 @@ export const updateRoute = developerActionClient
          },
       });
 
-      // Revalidate Layer 1 (memory) and Layer 2 (Next.js cache tags) immediately
-      await invalidateAdminPermissionsCache();
-      revalidateTag(`route-${path}`, "max");
-      revalidateTag(`route-${route.path}`, "max"); // Also invalidate old path if changed
+      // Revalidate Redis RBAC & route permission caches immediately
+      await Promise.all([
+         invalidateAdminPermissionsCache(),
+         invalidateCacheTags(
+            `route-${normalizePath(path)}`,
+            `route-${normalizePath(route.path)}`
+         ),
+      ]);
 
       return { ok: true as const, data: serializeBigInt(updated) };
    });
@@ -174,9 +181,11 @@ export const deleteRoute = developerActionClient
          where: { id: routeId },
       });
 
-      // Revalidate Layer 1 (memory) and Layer 2 (Next.js cache tags) immediately
-      await invalidateAdminPermissionsCache();
-      revalidateTag(`route-${route.path}`, "max");
+      // Revalidate Redis RBAC & route permission caches immediately
+      await Promise.all([
+         invalidateAdminPermissionsCache(),
+         invalidateCacheTags(`route-${normalizePath(route.path)}`),
+      ]);
 
       return { ok: true as const };
    });

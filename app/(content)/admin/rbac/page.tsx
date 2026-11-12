@@ -49,7 +49,7 @@ async function RBACContent() {
       return <div className="p-6 text-destructive font-medium">Unauthorized</div>;
    }
 
-   // All initial data fetched from Next.js 16 Layer 2 "use cache" (0 DB hits on cache hit)
+   // All initial data fetched from Redis cache (0 DB hits on cache hit)
    const [
       routeGroupsData,
       routesData,

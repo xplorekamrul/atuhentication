@@ -142,7 +142,7 @@ export const changePassword = actionClient
       });
 
       if (admin.email) {
-        resetExponentialLockout(`exp:account:${admin.email.toLowerCase().trim()}`);
+        await resetExponentialLockout(`exp:account:${admin.email.toLowerCase().trim()}`);
       }
 
       revalidatePath("/profile");
@@ -177,7 +177,7 @@ export const changePassword = actionClient
       });
 
       if (user.email) {
-        resetExponentialLockout(`exp:account:${user.email.toLowerCase().trim()}`);
+        await resetExponentialLockout(`exp:account:${user.email.toLowerCase().trim()}`);
       }
 
       revalidatePath("/profile");

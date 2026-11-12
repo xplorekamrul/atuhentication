@@ -30,7 +30,7 @@ export const updateUserPassword = superAdminActionClient
       });
 
       if (targetUser.email) {
-        resetExponentialLockout(`exp:account:${targetUser.email.toLowerCase().trim()}`);
+        await resetExponentialLockout(`exp:account:${targetUser.email.toLowerCase().trim()}`);
       }
 
       return { ok: true as const };
@@ -59,7 +59,7 @@ export const updateUserPassword = superAdminActionClient
       });
 
       if (targetAdmin.email) {
-        resetExponentialLockout(`exp:account:${targetAdmin.email.toLowerCase().trim()}`);
+        await resetExponentialLockout(`exp:account:${targetAdmin.email.toLowerCase().trim()}`);
       }
 
       return { ok: true as const };
@@ -86,7 +86,7 @@ export const updateUserPassword = superAdminActionClient
       });
 
       if (targetAdmin.email) {
-        resetExponentialLockout(`exp:account:${targetAdmin.email.toLowerCase().trim()}`);
+        await resetExponentialLockout(`exp:account:${targetAdmin.email.toLowerCase().trim()}`);
       }
 
       return { ok: true as const };
@@ -107,7 +107,7 @@ export const updateUserPassword = superAdminActionClient
         });
 
         if (targetUser.email) {
-          resetExponentialLockout(`exp:account:${targetUser.email.toLowerCase().trim()}`);
+          await resetExponentialLockout(`exp:account:${targetUser.email.toLowerCase().trim()}`);
         }
 
         return { ok: true as const };

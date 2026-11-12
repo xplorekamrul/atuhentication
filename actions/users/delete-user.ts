@@ -25,7 +25,7 @@ export const deleteUser = superAdminActionClient
       await prisma.user.delete({ where: { id: userBigIntId } });
 
       if (targetUser.email) {
-        resetExponentialLockout(`exp:account:${targetUser.email.toLowerCase().trim()}`);
+        await resetExponentialLockout(`exp:account:${targetUser.email.toLowerCase().trim()}`);
       }
 
       return { ok: true as const };
@@ -50,7 +50,7 @@ export const deleteUser = superAdminActionClient
       await prisma.admin.delete({ where: { id } });
 
       if (targetAdmin.email) {
-        resetExponentialLockout(`exp:account:${targetAdmin.email.toLowerCase().trim()}`);
+        await resetExponentialLockout(`exp:account:${targetAdmin.email.toLowerCase().trim()}`);
       }
       await invalidateAdminPermissionsCache(id);
 
@@ -74,7 +74,7 @@ export const deleteUser = superAdminActionClient
       await prisma.admin.delete({ where: { id } });
 
       if (targetAdmin.email) {
-        resetExponentialLockout(`exp:account:${targetAdmin.email.toLowerCase().trim()}`);
+        await resetExponentialLockout(`exp:account:${targetAdmin.email.toLowerCase().trim()}`);
       }
       await invalidateAdminPermissionsCache(id);
 
@@ -92,7 +92,7 @@ export const deleteUser = superAdminActionClient
         await prisma.user.delete({ where: { id: userBigIntId } });
 
         if (targetUser.email) {
-          resetExponentialLockout(`exp:account:${targetUser.email.toLowerCase().trim()}`);
+          await resetExponentialLockout(`exp:account:${targetUser.email.toLowerCase().trim()}`);
         }
 
         return { ok: true as const };
