@@ -18,7 +18,7 @@ export default function ClearRedisCacheButton() {
       const res = await fetch("/api/admin/cache/invalidate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ includeRateLimits: false }),
+        body: JSON.stringify({ includeRateLimits: true }),
       });
 
       const data = (await res.json().catch(() => ({}))) as {

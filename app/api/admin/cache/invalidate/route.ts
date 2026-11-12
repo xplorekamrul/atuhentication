@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json().catch(() => ({}))) as {
       includeRateLimits?: boolean;
     };
-    const includeRateLimits = Boolean(body?.includeRateLimits);
+    const includeRateLimits = body?.includeRateLimits ?? true;
 
     const result = await invalidateAllRedisCache({ includeRateLimits });
     try {
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
         message: `Cleared ${result.clearedKeys} cached key${result.clearedKeys === 1 ? "" : "s"} from ${sourceLabel}.`,
         timestamp: new Date().toISOString(),
       },
-      { status: 200, headers: { "Cache-Control": "no-store" } }
+      { status: 200, headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
     );
   } catch (error) {
     console.error("[API /api/admin/cache/invalidate] Failed:", error);

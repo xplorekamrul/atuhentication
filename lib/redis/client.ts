@@ -12,11 +12,16 @@ const globalForRedis = globalThis as unknown as {
   __redisLastFailedAt?: number;
   __redisLastWarnAt?: number;
   __redisReadyListeners?: Set<ReadyListener>;
+  __redisFlushListeners?: Set<ReadyListener>;
 };
 
 const readyListeners =
   globalForRedis.__redisReadyListeners ?? new Set<ReadyListener>();
 globalForRedis.__redisReadyListeners = readyListeners;
+
+const flushListeners =
+  globalForRedis.__redisFlushListeners ?? new Set<ReadyListener>();
+globalForRedis.__redisFlushListeners = flushListeners;
 
 export function getRedisKeyPrefix(): string {
   return KEY_PREFIX;
@@ -31,6 +36,23 @@ export function onRedisReady(listener: ReadyListener): () => void {
   return () => {
     readyListeners.delete(listener);
   };
+}
+
+export function onRedisCacheFlush(listener: ReadyListener): () => void {
+  flushListeners.add(listener);
+  return () => {
+    flushListeners.delete(listener);
+  };
+}
+
+export function emitRedisCacheFlush(): void {
+  for (const listener of flushListeners) {
+    try {
+      listener();
+    } catch (err) {
+      console.error("[Redis] onRedisCacheFlush listener error:", err);
+    }
+  }
 }
 
 function logFallbackWarning(reason: string): void {

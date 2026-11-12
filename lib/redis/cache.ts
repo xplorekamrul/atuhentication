@@ -1,8 +1,8 @@
 import type Redis from "ioredis";
 import {
+  emitRedisCacheFlush,
   getErrorMessage,
   getReadyRedisClient,
-  getRedisKeyPrefix,
   markRedisOffline,
   onRedisReady,
   prefixRedisKey,
@@ -276,7 +276,7 @@ export interface InvalidateAllCacheResult {
 }
 
 /**
- * Count active application cache keys currently stored in Redis (or fallback memory).
+ * Count active keys currently stored in the active Redis DB (or fallback memory).
  */
 export async function countRedisCacheKeys(): Promise<{
   mode: "redis" | "memory-fallback";
@@ -285,10 +285,10 @@ export async function countRedisCacheKeys(): Promise<{
   const redis = await getReadyRedisClient();
   if (redis) {
     try {
-      const keys = await scanRedisKeysByPattern(redis, `${prefixRedisKey("cache:")}*`);
-      return { mode: "redis", count: keys.length };
+      const count = await redis.dbsize();
+      return { mode: "redis", count };
     } catch (err: unknown) {
-      markRedisOffline(getErrorMessage(err, "Redis cache key scan failed"));
+      markRedisOffline(getErrorMessage(err, "Redis dbsize check failed"));
     }
   }
 
@@ -296,15 +296,19 @@ export async function countRedisCacheKeys(): Promise<{
 }
 
 /**
- * Flush all cached application data from Redis (and offline fallback memory) using non-blocking SCAN + UNLINK.
- * By default preserves rate-limit / brute-force bans (`rl:*`) unless `includeRateLimits: true` is passed.
+ * Flush cached data from Redis (and offline fallback memory).
+ * Defaults to flushing the entire active Redis database (`FLUSHDB`) so no stale cache or lock keys
+ * from current or previous builds/prefixes remain. Pass `{ includeRateLimits: false }` to flush `cache:*` only.
  */
 export async function invalidateAllRedisCache(options?: {
   includeRateLimits?: boolean;
 }): Promise<InvalidateAllCacheResult> {
-  const includeRateLimits = Boolean(options?.includeRateLimits);
+  const includeRateLimits = options?.includeRateLimits ?? true;
   const fallbackCount = fallbackCache.size;
   fallbackCache.clear();
+  if (includeRateLimits) {
+    emitRedisCacheFlush();
+  }
 
   const redis = await getReadyRedisClient();
   if (!redis) {
@@ -316,18 +320,25 @@ export async function invalidateAllRedisCache(options?: {
     };
   }
 
-  const pattern = includeRateLimits
-    ? `${getRedisKeyPrefix()}*`
-    : `${prefixRedisKey("cache:")}*`;
-
   try {
-    const keys = await scanRedisKeysByPattern(redis, pattern);
+    if (includeRateLimits) {
+      const totalKeys = await redis.dbsize();
+      await redis.flushdb();
+      return {
+        ok: true,
+        mode: "redis",
+        clearedKeys: totalKeys,
+        includeRateLimits: true,
+      };
+    }
+
+    const keys = await scanRedisKeysByPattern(redis, `${prefixRedisKey("cache:")}*`);
     const deleted = await unlinkRedisKeys(redis, keys);
     return {
       ok: true,
       mode: "redis",
       clearedKeys: deleted,
-      includeRateLimits,
+      includeRateLimits: false,
     };
   } catch (err: unknown) {
     markRedisOffline(getErrorMessage(err, "Redis full cache invalidation failed"));

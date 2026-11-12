@@ -11,6 +11,7 @@ import {
   getErrorMessage,
   getReadyRedisClient,
   markRedisOffline,
+  onRedisCacheFlush,
   onRedisReady,
   prefixRedisKey,
 } from "./redis/client";
@@ -43,10 +44,12 @@ globalRef.__expLockoutStore = expStore;
 
 if (!globalRef.__rateLimitReadyListener) {
   globalRef.__rateLimitReadyListener = true;
-  onRedisReady(() => {
+  const clearOfflineStores = () => {
     store.clear();
     expStore.clear();
-  });
+  };
+  onRedisReady(clearOfflineStores);
+  onRedisCacheFlush(clearOfflineStores);
 }
 
 // Automatically prune expired fallback keys every 5 minutes
