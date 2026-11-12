@@ -6,7 +6,15 @@ import {
   prefixRedisKey,
 } from "./client";
 
-export const DEFAULT_CACHE_TTL_SECONDS = 3600; // 1 hour (replaces Next.js cacheLife("hours"))
+export function getDefaultRedisCacheTtlSeconds(): number {
+  const raw = process.env.DEFAULT_REDIS_CACHE_TTL_SECONDS?.trim();
+  if (!raw) return 3600;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 3600;
+  return Math.floor(parsed);
+}
+
+export const DEFAULT_REDIS_CACHE_TTL_SECONDS = getDefaultRedisCacheTtlSeconds();
 
 interface FallbackCacheEntry {
   serialized: string;
@@ -71,7 +79,7 @@ export async function getOrSetCache<T>(options: {
   const {
     key,
     tags = [],
-    ttlSeconds = DEFAULT_CACHE_TTL_SECONDS,
+    ttlSeconds = getDefaultRedisCacheTtlSeconds(),
     fetcher,
   } = options;
   const fullKey = buildCacheEntryKey(key);

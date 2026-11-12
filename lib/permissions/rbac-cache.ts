@@ -1,7 +1,7 @@
 import { serializeBigInt, toBigIntOrNull } from "@/lib/bigint-utils";
 import { prisma } from "@/lib/prisma";
 import {
-  DEFAULT_CACHE_TTL_SECONDS,
+  DEFAULT_REDIS_CACHE_TTL_SECONDS,
   getOrSetCache,
   hashCachePart,
 } from "@/lib/redis/cache";
@@ -15,7 +15,7 @@ export async function getCachedRolesList(
   return getOrSetCache({
     key: `rbac:roles:list:${page}:${pageSize}:${hashCachePart(q)}`,
     tags: ["rbac-data", "rbac-roles"],
-    ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+    ttlSeconds: DEFAULT_REDIS_CACHE_TTL_SECONDS,
     fetcher: async () => {
       const where: Prisma.RoleWhereInput = q ? { name: { contains: q } } : {};
 
@@ -52,7 +52,7 @@ export async function getCachedRoleCount() {
   return getOrSetCache({
     key: "rbac:roles:count",
     tags: ["rbac-data", "rbac-roles"],
-    ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+    ttlSeconds: DEFAULT_REDIS_CACHE_TTL_SECONDS,
     fetcher: () => prisma.role.count(),
   });
 }
@@ -65,7 +65,7 @@ export async function getCachedRouteGroupsList(
   return getOrSetCache({
     key: `rbac:route-groups:list:${page}:${pageSize}:${hashCachePart(q)}`,
     tags: ["rbac-data", "rbac-route-groups"],
-    ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+    ttlSeconds: DEFAULT_REDIS_CACHE_TTL_SECONDS,
     fetcher: async () => {
       const where: Prisma.RouteGroupWhereInput = q ? { name: { contains: q } } : {};
 
@@ -102,7 +102,7 @@ export async function getCachedAllRouteGroups() {
   return getOrSetCache({
     key: "rbac:route-groups:all",
     tags: ["rbac-data", "rbac-route-groups"],
-    ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+    ttlSeconds: DEFAULT_REDIS_CACHE_TTL_SECONDS,
     fetcher: async () => {
       const [items, total] = await Promise.all([
         prisma.routeGroup.findMany({
@@ -130,7 +130,7 @@ export async function getCachedRoutesList(
   return getOrSetCache({
     key: `rbac:routes:list:${page}:${pageSize}:${hashCachePart(q)}:${groupId || "all"}`,
     tags: ["rbac-data", "rbac-routes"],
-    ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+    ttlSeconds: DEFAULT_REDIS_CACHE_TTL_SECONDS,
     fetcher: async () => {
       const and: Prisma.RouteWhereInput[] = [];
 
@@ -186,7 +186,7 @@ export async function getCachedAllRoutes() {
   return getOrSetCache({
     key: "rbac:routes:all",
     tags: ["rbac-data", "rbac-routes"],
-    ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+    ttlSeconds: DEFAULT_REDIS_CACHE_TTL_SECONDS,
     fetcher: async () => {
       const [items, total] = await Promise.all([
         prisma.route.findMany({
@@ -226,7 +226,7 @@ export async function getCachedTotalRoutesCount(): Promise<number> {
   return getOrSetCache({
     key: "rbac:routes:count",
     tags: ["sidebar-routes", "rbac-data", "rbac-routes"],
-    ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+    ttlSeconds: DEFAULT_REDIS_CACHE_TTL_SECONDS,
     fetcher: () => prisma.route.count(),
   });
 }

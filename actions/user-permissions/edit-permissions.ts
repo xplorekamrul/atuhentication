@@ -4,13 +4,13 @@ import { auth } from "@/lib/auth";
 import { toBigIntOrNull } from "@/lib/bigint-utils";
 import { normalizePath } from "@/lib/permissions/route-pattern-matcher";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_CACHE_TTL_SECONDS, getOrSetCache } from "@/lib/redis/cache";
+import { DEFAULT_REDIS_CACHE_TTL_SECONDS, getOrSetCache } from "@/lib/redis/cache";
 
 async function getCachedAdminRoleInfo(adminId: string) {
    return getOrSetCache({
       key: `rbac:admin:role-info:${adminId}`,
       tags: ["admin-permissions", `admin-permissions-${adminId}`],
-      ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+      ttlSeconds: DEFAULT_REDIS_CACHE_TTL_SECONDS,
       fetcher: async () => {
          const admin = await prisma.admin.findUnique({
             where: { id: adminId },
@@ -79,7 +79,7 @@ async function getCachedEditPermission(
    return getOrSetCache<boolean | null>({
       key: `rbac:admin:edit-perm:${normalizedRoute}:${adminLevel}:${sortedRoleKey}`,
       tags: ["admin-permissions", "route-edit-permissions", `route-${normalizedRoute}`],
-      ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+      ttlSeconds: DEFAULT_REDIS_CACHE_TTL_SECONDS,
       fetcher: async () => {
          const route = await prisma.route.findUnique({
             where: { path: normalizedRoute },
@@ -171,7 +171,7 @@ async function getCachedUserEditPermissions(
    return getOrSetCache<Record<string, boolean>>({
       key: `rbac:admin:edit-all:${adminLevel}:${sortedRoleKey}`,
       tags: ["admin-permissions", "user-edit-permissions", `level-${adminLevel}`],
-      ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+      ttlSeconds: DEFAULT_REDIS_CACHE_TTL_SECONDS,
       fetcher: async () => {
          const permissions: Record<string, boolean> = {};
 

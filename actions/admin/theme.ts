@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getErrorMessage } from "@/lib/redis/client";
-import { DEFAULT_CACHE_TTL_SECONDS, getOrSetCache, invalidateCacheTags } from "@/lib/redis/cache";
+import { DEFAULT_REDIS_CACHE_TTL_SECONDS, getOrSetCache, invalidateCacheTags } from "@/lib/redis/cache";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import type { ThemeColors } from "@/lib/theme-utils";
@@ -12,7 +12,7 @@ export async function getThemes() {
     const themes = await getOrSetCache({
       key: "theme:list",
       tags: ["theme"],
-      ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+      ttlSeconds: DEFAULT_REDIS_CACHE_TTL_SECONDS,
       fetcher: async () => {
         let rows = await prisma.theme.findMany({
           orderBy: { createdAt: "desc" },

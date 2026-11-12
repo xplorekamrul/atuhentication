@@ -104,6 +104,15 @@ function buildExpRedisKey(key: string): string {
 }
 
 /**
+ * Controlled by `.env` `RATELIMIT_ENABLED` ("true" / "false"). Defaults to true if omitted.
+ */
+export function isRateLimitEnabled(): boolean {
+  const raw = process.env.RATELIMIT_ENABLED?.trim().toLowerCase();
+  if (!raw) return true;
+  return raw !== "false" && raw !== "0" && raw !== "no" && raw !== "off";
+}
+
+/**
  * Format duration in seconds to a human-readable English string.
  * Examples: "45 minutes", "1 hour", "2 hours", "4 hours", "8 hours"
  */
@@ -165,6 +174,10 @@ export async function checkExponentialLockout(key: string): Promise<{
   formattedDuration: string;
   tier: number;
 }> {
+  if (!isRateLimitEnabled()) {
+    return { locked: false, resetInSeconds: 0, formattedDuration: "", tier: 0 };
+  }
+
   const now = Date.now();
   const record = await readExpRecord(key);
 
@@ -205,6 +218,16 @@ export async function recordExponentialFailure(
   attempts: number;
   threshold: number;
 }> {
+  if (!isRateLimitEnabled()) {
+    return {
+      locked: false,
+      resetInSeconds: 0,
+      formattedDuration: "",
+      attempts: 0,
+      threshold: options.threshold,
+    };
+  }
+
   const now = Date.now();
   const baseSeconds = options.baseLockSeconds ?? 3600;
   const maxSeconds = options.maxLockSeconds ?? 24 * 3600;
@@ -267,6 +290,10 @@ export async function recordSpamWhileLocked(
   formattedDuration: string;
   tier: number;
 }> {
+  if (!isRateLimitEnabled()) {
+    return { resetInSeconds: 0, formattedDuration: "", tier: 0 };
+  }
+
   const now = Date.now();
   const baseSeconds = options.baseLockSeconds ?? 3600;
   const maxSeconds = options.maxLockSeconds ?? 24 * 3600;
@@ -331,6 +358,10 @@ export async function isRateLimited(
   key: string,
   limit: number
 ): Promise<{ limited: boolean; remaining: number; resetInSeconds: number }> {
+  if (!isRateLimitEnabled()) {
+    return { limited: false, remaining: limit, resetInSeconds: 0 };
+  }
+
   const redis = await getReadyRedisClient();
   if (redis) {
     try {
@@ -382,6 +413,14 @@ export async function incrementRateLimit(
   limit: number,
   windowSeconds: number
 ): Promise<RateLimitResult> {
+  if (!isRateLimitEnabled()) {
+    return {
+      success: true,
+      remaining: limit,
+      resetInSeconds: windowSeconds,
+    };
+  }
+
   const redis = await getReadyRedisClient();
   if (redis) {
     try {

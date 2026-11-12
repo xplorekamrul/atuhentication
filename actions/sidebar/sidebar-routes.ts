@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth';
 import { getCachedAdminAccessiblePaths } from '@/lib/permissions/permissions';
 import { prisma } from '@/lib/prisma';
-import { DEFAULT_CACHE_TTL_SECONDS, getOrSetCache } from '@/lib/redis/cache';
+import { DEFAULT_REDIS_CACHE_TTL_SECONDS, getOrSetCache } from '@/lib/redis/cache';
 
 export type SidebarRoute = {
    path: string;
@@ -15,7 +15,7 @@ async function getCachedAllRoutesMeta() {
    return getOrSetCache({
       key: 'rbac:sidebar:routes-meta',
       tags: ['sidebar-routes', 'rbac-data', 'rbac-routes'],
-      ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+      ttlSeconds: DEFAULT_REDIS_CACHE_TTL_SECONDS,
       fetcher: async () => {
          const routes = await prisma.route.findMany({
             select: {

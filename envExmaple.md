@@ -40,6 +40,8 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 # Run `docker compose up -d` to start local Redis on port 6379
 REDIS_URL="redis://localhost:6379"
 REDIS_PREFIX="authapp:"
+DEFAULT_REDIS_CACHE_TTL_SECONDS=3600
+RATELIMIT_ENABLED=true
 
 # ---------- OAuth Credentials ----------
 # Get from https://console.cloud.google.com/apis/credentials

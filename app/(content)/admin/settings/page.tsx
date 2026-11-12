@@ -1,5 +1,7 @@
 import { AdminDummyPageShell } from "@/components/admin/rbac-dummy/AdminDummyPageShell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { isRateLimitEnabled } from "@/lib/rate-limit";
+import { getDefaultRedisCacheTtlSeconds } from "@/lib/redis/cache";
 import { getRedisStatus } from "@/lib/redis/client";
 import { Suspense } from "react";
 
@@ -9,11 +11,21 @@ export const metadata = {
 
 async function RedisSettingsContent() {
   const redisStatus = await getRedisStatus();
+  const cacheTtlSeconds = getDefaultRedisCacheTtlSeconds();
+  const rateLimitEnabled = isRateLimitEnabled();
 
   const configItems = [
     { key: "Session Version Enforcement", value: "Active (Real-time JWT check)" },
-    { key: "Rate Limit Escalation", value: "Redis Lua (1h -> 2h -> 4h -> 8h -> 16h -> 24h)" },
-    { key: "RBAC & Sidebar Cache Engine", value: "Redis (1h TTL + Tag Sets, No Use Cache)" },
+    {
+      key: "Rate Limit Escalation",
+      value: rateLimitEnabled
+        ? "Redis Lua (1h -> 2h -> 4h -> 8h -> 16h -> 24h)"
+        : "Disabled (RATELIMIT_ENABLED=false)",
+    },
+    {
+      key: "RBAC & Sidebar Cache Engine",
+      value: `Redis (${cacheTtlSeconds}s TTL + Tag Sets, No Use Cache)`,
+    },
     {
       key: "Redis Connection Mode",
       value: redisStatus.connected
@@ -37,7 +49,13 @@ async function RedisSettingsContent() {
             : "Start Docker Redis to switch live",
         },
         { label: "Admin Auth Mode", value: "Credentials", hint: "OAuth disabled on admin side" },
-        { label: "Rate Limiter", value: "Redis Lua", hint: "Atomic window + exponential lockouts" },
+        {
+          label: "Rate Limiter",
+          value: rateLimitEnabled ? "Redis Lua" : "Disabled",
+          hint: rateLimitEnabled
+            ? "Atomic window + exponential lockouts"
+            : "Turned off via RATELIMIT_ENABLED",
+        },
         { label: "Session Checks", value: "Strict", hint: "Status + sessionVersion verified" },
       ]}
     >

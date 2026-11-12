@@ -3,7 +3,7 @@
 import { auth } from "@/lib/auth";
 import { getAdminAccessibleRoutes } from "@/lib/permissions/permissions";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_CACHE_TTL_SECONDS, getOrSetCache } from "@/lib/redis/cache";
+import { DEFAULT_REDIS_CACHE_TTL_SECONDS, getOrSetCache } from "@/lib/redis/cache";
 
 export type RouteWithGroup = {
    id: string;
@@ -47,7 +47,7 @@ async function getCachedDatabaseRoutes(): Promise<RouteWithGroup[]> {
    return getOrSetCache({
       key: "rbac:sidebar:db-routes",
       tags: ["rbac-data", "rbac-routes", "sidebar-routes"],
-      ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+      ttlSeconds: DEFAULT_REDIS_CACHE_TTL_SECONDS,
       fetcher: async () => {
          const routes = await prisma.route.findMany({
             select: {

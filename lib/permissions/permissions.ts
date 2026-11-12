@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import {
-  DEFAULT_CACHE_TTL_SECONDS,
+  DEFAULT_REDIS_CACHE_TTL_SECONDS,
   getOrSetCache,
   invalidateCacheTags,
 } from "@/lib/redis/cache";
@@ -23,7 +23,7 @@ async function resolveAdminLevel(adminId: string): Promise<string | null> {
   return getOrSetCache<string | null>({
     key: `rbac:admin:level:${adminId}`,
     tags: ["admin-permissions", `admin-permissions-${adminId}`],
-    ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+    ttlSeconds: DEFAULT_REDIS_CACHE_TTL_SECONDS,
     fetcher: async () => {
       const admin = await prisma.admin.findUnique({
         where: { id: adminId },
@@ -49,7 +49,7 @@ export async function fetchAdminAccessiblePaths(
   return getOrSetCache<string[]>({
     key: `rbac:admin:paths:${adminId}:${level}`,
     tags: ["admin-permissions", `admin-permissions-${adminId}`],
-    ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+    ttlSeconds: DEFAULT_REDIS_CACHE_TTL_SECONDS,
     fetcher: async () => {
       if (level === "SUPER_ADMIN") {
         const routes = await prisma.route.findMany({
@@ -172,7 +172,7 @@ async function getCachedAdminCanEditRoute(
       "route-edit-permissions",
       `route-${normalizedRoute}`,
     ],
-    ttlSeconds: DEFAULT_CACHE_TTL_SECONDS,
+    ttlSeconds: DEFAULT_REDIS_CACHE_TTL_SECONDS,
     fetcher: async () => {
       if (level === "SUPER_ADMIN") {
         const route = await prisma.route.findUnique({
